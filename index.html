@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Talk Coordination - Send</title>
+<style>
+  :root{--bg:#f5eef7;--card:#fff;--ink:#2a1a30;--accent:#5a4a1a;--line:#d9c9df}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:var(--bg);color:var(--ink);padding:1rem}
+  .card{max-width:34rem;margin:1rem auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1.25rem}
+  h1{font-size:1.15rem;margin:0 0 1rem}
+  label{display:block;font-weight:600;margin:0.9rem 0 0.3rem;font-size:0.9rem}
+  input,select,textarea{width:100%;padding:0.6rem;font-size:1rem;border:1px solid var(--line);border-radius:8px;font-family:inherit}
+  textarea{min-height:6rem;resize:vertical}
+  .hint{font-size:0.8rem;color:#6a5a70;margin-top:0.25rem}
+  button{margin-top:1.25rem;width:100%;padding:0.8rem;font-size:1rem;font-weight:700;color:#fff;background:var(--accent);border:0;border-radius:8px}
+  button:disabled{opacity:0.5}
+  #result{margin-top:1rem;padding:0.75rem;border-radius:8px;font-size:0.9rem;display:none;white-space:pre-wrap}
+  #result.ok{display:block;background:#e6f4ea;color:#14481a}
+  #result.err{display:block;background:#fbeaea;color:#5a1414}
+  .muted{color:#6a5a70;font-size:0.8rem;margin-top:0.6rem}
+  #loading,#dead{font-size:0.95rem;color:#6a5a70}
+  #dead{color:#5a1414}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Talk Coordination - Send</h1>
+
+  <div id="loading">Checking link...</div>
+  <div id="dead" style="display:none">This link is invalid, already used, or expired. Mint a fresh one from your bookmark.</div>
+
+  <div id="form" style="display:none">
+    <label>Recipient (E.164)</label>
+    <input id="to" placeholder="+447..." inputmode="tel" autocomplete="off">
+
+    <label>Mode</label>
+    <select id="mode">
+      <option value="template">Template (opens a 24h window)</option>
+      <option value="freeform">Free-form (only in an open window)</option>
+    </select>
+
+    <div id="tplBox">
+      <label>Name (fills template variable 1)</label>
+      <input id="name" placeholder="e.g. David" autocomplete="off">
+    </div>
+
+    <div id="ffBox" style="display:none">
+      <label>Message</label>
+      <textarea id="body" placeholder="Type your message..."></textarea>
+    </div>
+
+    <label>Schedule (optional - your local time)</label>
+    <input id="sendat" type="datetime-local">
+    <div class="hint">Blank = send now. If set: 15 min - 7 days ahead. Converted to UTC automatically.</div>
+
+    <button id="go">Send</button>
+    <div id="result"></div>
+    <div class="muted">Single-use link - sending burns it. Mint a fresh one for the next message.</div>
+  </div>
+</div>
+
+<script>
+  // Stable function endpoint (supabase.co). NOT the domain we ever switch —
+  // that's this page's own address (FORM_BASE_URL), handled by DNS, not here.
+  var FN_URL = "https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1/send-message";
+
+  var token = new URLSearchParams(location.search).get("t");
+  function $(id){ return document.getElementById(id); }
+
+  function showDead(msg){
+    $("loading").style.display = "none";
+    $("form").style.display = "none";
+    if (msg) $("dead").textContent = msg;
+    $("dead").style.display = "block";
+  }
+
+  function syncMode(){
+    var ff = $("mode").value === "freeform";
+    $("ffBox").style.display = ff ? "block" : "none";
+    $("tplBox").style.display = ff ? "none" : "block";
+  }
+
+  function show(kind, msg){
+    var r = $("result");
+    r.className = kind;
+    r.textContent = msg;
+  }
+
+  function prefill(p){
+    if (p.reply_to) $("to").value = p.reply_to;
+    if (p.mode){ $("mode").value = p.mode; $("mode").disabled = true; }
+    syncMode();
+  }
+
+  async function init(){
+    if (!token){ showDead("No link token. Open the link from your email."); return; }
+    try {
+      var res = await fetch(FN_URL + "?t=" + encodeURIComponent(token));
+      var data = await res.json();
+      if (!data.ok){ showDead(); return; }
+      prefill(data.payload || {});
+      $("loading").style.display = "none";
+      $("form").style.display = "block";
+    } catch (e) {
+      showDead("Couldn't reach the server. Check your connection and reopen the link.");
+    }
+  }
+
+  async function send(){
+    var btn = $("go");
+    btn.disabled = true;
+    show("", "");
+    try {
+      var fd = new FormData();
+      fd.append("to", $("to").value.trim());
+      fd.append("mode", $("mode").value);
+      fd.append("name", $("name").value.trim());
+      fd.append("body", $("body").value.trim());
+      var dt = $("sendat").value;
+      if (dt){ fd.append("send_at_utc", new Date(dt).toISOString()); } // local -> UTC in browser
+      var res = await fetch(FN_URL + "?t=" + encodeURIComponent(token), { method: "POST", body: fd });
+      var data = await res.json();
+      show(data.ok ? "ok" : "err", data.message || (data.ok ? "Sent." : "Failed."));
+      if (data.ok){ btn.textContent = "Sent"; } else { btn.disabled = false; }
+    } catch (e) {
+      show("err", "Network error: " + e.message);
+      btn.disabled = false;
+    }
+  }
+
+  $("mode").addEventListener("change", syncMode);
+  $("go").addEventListener("click", send);
+  init();
+</script>
+</body>
+</html>
