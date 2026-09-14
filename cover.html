@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<title>Cover Period — Darlington West Talk Coordination</title>
+<style>
+  :root {
+    --paper: #f1f3f5;
+    --panel: #ffffff;
+    --ink: #1b2430;
+    --ink-soft: #4c5766;
+    --rule: #d7dbe0;
+    --ok: #2f7a4d;
+    --warn: #c77d24;
+    --bad: #b4432f;
+    --ok-bg: #eaf3ee;
+    --warn-bg: #fbf1e4;
+    --bad-bg: #f8ebe8;
+    --font-head: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 20px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 6px;
+  }
+  header.top h1 {
+    font-family: var(--font-head);
+    font-weight: 400;
+    font-size: 26px;
+    margin: 0;
+  }
+  .top-meta { font-size: 13px; color: var(--ink-soft); display: flex; align-items: center; gap: 14px; }
+  .who {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--ink-soft);
+  }
+  select, input, textarea, button {
+    font-family: var(--font-body);
+    font-size: 14px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 4px 7px;
+    background: var(--panel);
+    color: var(--ink);
+  }
+  button {
+    cursor: pointer;
+    background: var(--ink);
+    color: var(--panel);
+    border-color: var(--ink);
+  }
+  button:hover { opacity: 0.85; }
+  button.ghost { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  section { margin-top: 34px; }
+  section > h2 {
+    font-family: var(--font-head);
+    font-weight: 400;
+    font-size: 18px;
+    margin: 0 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .subnote { font-size: 13px; color: var(--ink-soft); margin: -6px 0 14px; }
+
+  .attention-strip { display: flex; flex-direction: column; gap: 8px; }
+  .attention-row {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; padding: 9px 12px; border-radius: 3px; font-size: 14px;
+  }
+  .attention-row.warn { background: var(--warn-bg); color: #7a4c11; }
+  .attention-row.bad  { background: var(--bad-bg);  color: #7a2c1c; }
+  .none-notice { color: var(--ink-soft); font-size: 14px; font-style: italic; }
+
+  table { width: 100%; border-collapse: collapse; background: var(--panel); }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: 12px; text-transform: none; color: var(--ink-soft); font-weight: 600; border-bottom: 1px solid var(--ink); }
+  tr:last-child td { border-bottom: none; }
+  .month-head td {
+    background: var(--paper); font-family: var(--font-head); font-size: 15px;
+    padding-top: 16px; border-bottom: 1px solid var(--rule); color: var(--ink);
+  }
+
+  .status-tag { font-size: 12.5px; padding: 2px 0; border-left: 3px solid var(--rule); padding-left: 7px; }
+  .status-confirmed { border-color: var(--ok); color: var(--ok); }
+  .status-proposed { border-color: var(--warn); color: #8a5a17; }
+  .status-cancelled, .status-no_speaker { border-color: var(--bad); color: var(--bad); }
+  .status-entered_nws { border-color: var(--ink-soft); color: var(--ink-soft); }
+
+  .field-row { display: flex; flex-direction: column; gap: 4px; }
+  .field-row select, .field-row input { width: 100%; min-width: 120px; }
+  .save-msg { font-size: 12px; margin-top: 3px; }
+  .save-msg.ok { color: var(--ok); }
+  .save-msg.err { color: var(--bad); }
+
+  .cong-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .cong-card { background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 12px 14px; }
+  .cong-card h3 { margin: 0 0 4px; font-size: 15px; font-family: var(--font-head); font-weight: 400; }
+  .cong-card .line { font-size: 13px; color: var(--ink-soft); }
+
+  form.add-block {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 12px;
+  }
+  form.add-block .field-row { min-width: 140px; flex: 1; }
+  form.add-block label { font-size: 12px; color: var(--ink-soft); }
+
+  .log-entry { padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-entry .when { color: var(--ink-soft); font-size: 12px; }
+  .log-entry .who-tag { font-weight: 600; }
+
+  .loading, .error-box { padding: 40px 0; text-align: center; color: var(--ink-soft); }
+  .error-box { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="loading">Loading cover period data…</div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get('k') || '';
+const API_BASE = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
+const app = document.getElementById('app');
+
+let state = null;
+let whoAmI = localStorage.getItem('cover_who') || 'Ian';
+
+const STATUS_OPTIONS = ['proposed','confirmed','entered_nws','cancelled','no_speaker'];
+const MONTH_STATUS_OPTIONS = ['pencilled','pairing_confirmed','canvassing','offers_out','slots_confirmed','entered_in_nws','cancelled','closed'];
+const BLOCK_REASONS = ['CO Visit','Circuit Assembly','District Convention','Branch Talk','Memorial','Other'];
+
+async function load() {
+  if (!TOKEN) { renderError('No access link found. This page needs a link with a ?k= token in the address.'); return; }
+  try {
+    const res = await fetch(`${API_BASE}/cover-period-data?k=${encodeURIComponent(TOKEN)}`);
+    const data = await res.json();
+    if (!data.ok) { renderError(data.message || 'This link is not currently valid.'); return; }
+    state = data;
+    render();
+  } catch (e) {
+    renderError('Could not reach the server. Check your connection and try again.');
+  }
+}
+
+function renderError(msg) {
+  app.innerHTML = `<header class="top"><h1>Cover Period</h1></header><div class="error-box">${escapeHtml(msg)}</div>`;
+}
+
+function render() {
+  const now = new Date();
+  const upcoming = state.overview.filter(r => new Date(r.sunday_date) >= new Date(now.toDateString()));
+  const byMonth = {};
+  for (const row of upcoming) {
+    const key = row.month;
+    (byMonth[key] = byMonth[key] || []).push(row);
+  }
+
+  const attentionRows = [];
+  for (const r of upcoming) {
+    if (r.status === 'no_speaker') attentionRows.push({level:'bad', text:`${fmtDate(r.sunday_date)} (${r.direction}) has no speaker assigned.`});
+    if (r.status === 'proposed' && (new Date(r.sunday_date) - now) / 86400000 < 21) attentionRows.push({level:'warn', text:`${fmtDate(r.sunday_date)} (${r.direction}) is still only proposed, and is under 3 weeks out.`});
+  }
+  for (const h of state.exchange_health) {
+    const flagVal = Object.values(h).find(v => typeof v === 'boolean' && v === true);
+    if (flagVal) attentionRows.push({level:'warn', text: JSON.stringify(h)});
+  }
+
+  app.innerHTML = `
+    <header class="top">
+      <h1>Cover Period</h1>
+      <div class="top-meta">
+        <span class="who">Acting as
+          <select id="whoSelect">
+            <option value="Ian" ${whoAmI==='Ian'?'selected':''}>Ian</option>
+            <option value="Matt" ${whoAmI==='Matt'?'selected':''}>Matt</option>
+          </select>
+        </span>
+        <button class="ghost" id="refreshBtn">Refresh</button>
+      </div>
+    </header>
+
+    <section id="attention-section">
+      <h2>Needs attention</h2>
+      ${attentionRows.length
+        ? `<div class="attention-strip">${attentionRows.map(a => `<div class="attention-row ${a.level}">${escapeHtml(a.text)}</div>`).join('')}</div>`
+        : `<div class="none-notice">Nothing flagged right now.</div>`}
+    </section>
+
+    <section>
+      <h2>Upcoming exchanges</h2>
+      <p class="subnote">Every booked Sunday, this congregation and every partner. Change status, speaker, talk number or note directly in the row — every change is logged and emails Matt.</p>
+      ${Object.keys(byMonth).sort().map(monthKey => monthBlock(monthKey, byMonth[monthKey])).join('')}
+    </section>
+
+    <section>
+      <h2>Congregations</h2>
+      <div class="cong-grid">
+        ${state.congregations.map(c => {
+          const coord = state.coordinators.find(co => co.home_cong_id === c.id);
+          return `<div class="cong-card">
+            <h3>${escapeHtml(c.name)}</h3>
+            ${coord ? `<div class="line">Coordinator: ${escapeHtml(coord.full_name)}</div><div class="line">${escapeHtml(coord.email || '')}</div>` : `<div class="line">No coordinator on file</div>`}
+            ${c.image_email ? `<div class="line">Images: ${escapeHtml(c.image_email)}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </section>
+
+    <section>
+      <h2>Blocked dates</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Congregation</th><th>Direction</th><th>Reason</th><th>Note</th></tr></thead>
+        <tbody>
+          ${state.blocked_dates.map(b => `<tr>
+            <td>${fmtDate(b.blocked_date)}</td>
+            <td>${escapeHtml(b.congregations ? b.congregations.name : '')}</td>
+            <td>${b.blocks_direction ? escapeHtml(b.blocks_direction) : 'Fully blocked'}</td>
+            <td>${escapeHtml(b.reason)}</td>
+            <td>${escapeHtml(b.note || '')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <h3 style="font-family:var(--font-head);font-weight:400;font-size:15px;margin:18px 0 8px;">Log a new blocked date</h3>
+      <form class="add-block" id="addBlockForm">
+        <div class="field-row"><label>Congregation</label>
+          <select name="congregation_id" required>
+            <option value="">Select…</option>
+            ${state.congregations.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field-row"><label>Date</label><input type="date" name="blocked_date" required></div>
+        <div class="field-row"><label>Direction</label>
+          <select name="blocks_direction">
+            <option value="">Fully blocked (both)</option>
+            <option value="F2">F2 — won't receive a DW speaker</option>
+            <option value="F3">F3 — isn't sending anyone to DW</option>
+          </select>
+        </div>
+        <div class="field-row"><label>Reason</label>
+          <select name="reason" required>${BLOCK_REASONS.map(r => `<option value="${r}">${r}</option>`).join('')}</select>
+        </div>
+        <div class="field-row" style="flex:2;"><label>Note (optional)</label><input type="text" name="note"></div>
+        <button type="submit">Add block</button>
+        <span class="save-msg" id="addBlockMsg"></span>
+      </form>
+    </section>
+
+    <section>
+      <h2>Recent changes</h2>
+      ${state.recent_changes.length
+        ? state.recent_changes.map(c => `<div class="log-entry">
+            <span class="who-tag">${escapeHtml(c.made_by || 'Unknown')}</span> changed
+            <strong>${escapeHtml(c.field_name)}</strong> on ${escapeHtml(c.table_name)} —
+            ${escapeHtml(c.old_value ?? '(empty)')} → ${escapeHtml(c.new_value ?? '(empty)')}
+            ${c.note ? ` (${escapeHtml(c.note)})` : ''}
+            <div class="when">${new Date(c.created_at).toLocaleString('en-GB')}</div>
+          </div>`).join('')
+        : `<div class="none-notice">No changes logged yet.</div>`}
+    </section>
+  `;
+
+  document.getElementById('whoSelect').addEventListener('change', e => {
+    whoAmI = e.target.value;
+    localStorage.setItem('cover_who', whoAmI);
+  });
+  document.getElementById('refreshBtn').addEventListener('click', () => { app.innerHTML = '<div class="loading">Refreshing…</div>'; load(); });
+  document.getElementById('addBlockForm').addEventListener('submit', onAddBlock);
+  app.querySelectorAll('[data-field-change]').forEach(el => el.addEventListener('change', onFieldChange));
+}
+
+function monthBlock(monthKey, rows) {
+  return `<table style="margin-bottom:20px;">
+    <tr class="month-head"><td colspan="6">${fmtMonth(monthKey)}</td></tr>
+    <thead><tr><th>Date</th><th>Dir.</th><th>Congregation</th><th>Speaker</th><th>Talk</th><th>Status</th></tr></thead>
+    <tbody>
+      ${rows.map(r => rowHtml(r)).join('')}
+    </tbody>
+  </table>`;
+}
+
+function rowHtml(r) {
+  const speakerOptions = state.speakers
+    .map(s => `<option value="${s.id}" ${s.id===r.speaker_id?'selected':''}>${escapeHtml(s.full_name)}</option>`)
+    .join('');
+  return `<tr data-slot-id="${r.exchange_slot_id}">
+    <td>${fmtDate(r.sunday_date)}</td>
+    <td>${escapeHtml(r.direction)}</td>
+    <td>${escapeHtml(r.partner_congregation || 'Darlington West')}</td>
+    <td>
+      <div class="field-row">
+        <select data-field-change data-table="exchange_slots" data-field="speaker_id" data-id="${r.exchange_slot_id}">
+          <option value="">— none —</option>
+          ${speakerOptions}
+        </select>
+      </div>
+    </td>
+    <td>
+      <div class="field-row">
+        <input type="number" style="width:64px" value="${r.talk_number ?? ''}"
+          data-field-change data-table="exchange_slots" data-field="talk_number" data-id="${r.exchange_slot_id}">
+      </div>
+    </td>
+    <td>
+      <div class="field-row">
+        <select data-field-change data-table="exchange_slots" data-field="status" data-id="${r.exchange_slot_id}">
+          ${STATUS_OPTIONS.map(s => `<option value="${s}" ${s===r.status?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <span class="status-tag status-${r.status}">${r.status}</span>
+      </div>
+    </td>
+  </tr>`;
+}
+
+async function onFieldChange(e) {
+  const el = e.target;
+  const table_name = el.dataset.table;
+  const field_name = el.dataset.field;
+  const record_id = el.dataset.id;
+  const new_value = el.value;
+
+  el.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/cover-period-change`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, action: 'field_change', made_by: whoAmI, table_name, field_name, new_value }),
+    });
+    const data = await res.json();
+    el.disabled = false;
+    if (!data.ok) { alert('Could not save: ' + data.message); return; }
+    load();
+  } catch (err) {
+    el.disabled = false;
+    alert('Could not save — check your connection and try again.');
+  }
+}
+
+async function onAddBlock(e) {
+  e.preventDefault();
+  const form = e.target;
+  const msg = document.getElementById('addBlockMsg');
+  const fd = new FormData(form);
+  const payload = {
+    token: TOKEN, action: 'blocked_date', made_by: whoAmI,
+    congregation_id: fd.get('congregation_id'),
+    blocked_date: fd.get('blocked_date'),
+    blocks_direction: fd.get('blocks_direction'),
+    reason: fd.get('reason'),
+    note: fd.get('note'),
+  };
+  if (!payload.congregation_id || !payload.blocked_date) { msg.textContent = 'Congregation and date are required.'; msg.className = 'save-msg err'; return; }
+
+  try {
+    const res = await fetch(`${API_BASE}/cover-period-change`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.ok) { msg.textContent = data.message; msg.className = 'save-msg err'; return; }
+    msg.textContent = 'Added.'; msg.className = 'save-msg ok';
+    form.reset();
+    load();
+  } catch (err) {
+    msg.textContent = 'Could not reach the server.'; msg.className = 'save-msg err';
+  }
+}
+
+function fmtDate(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+function fmtMonth(m) {
+  return new Date(m + 'T00:00:00').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+load();
+</script>
+</body>
+</html>
