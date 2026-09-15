@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<title>Record canvass reply</title>
+<style>
+  :root{
+    --paper:#f1f3f5;--panel:#fff;--ink:#1b2430;--ink-soft:#4c5766;--rule:#d7dbe0;
+    --ok:#2f7a4d;--bad:#b4432f;--accent:#2f5d7a;--home:#8a5a17;--home-bg:#fbf1e4;--dead:#eceef0;
+    --fh:Georgia,'Iowan Old Style','Times New Roman',serif;
+    --fb:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.5}
+  .wrap{max-width:620px;margin:0 auto;padding:24px 18px 80px}
+  h1{font-family:var(--fh);font-weight:400;font-size:23px;margin:0 0 4px}
+  .sub{color:var(--ink-soft);font-size:13px;margin:0 0 20px}
+  .card{background:var(--panel);border:1px solid var(--rule);border-radius:5px;padding:16px 18px;margin-bottom:16px}
+  .msg-quote{background:#eef3f6;border-left:3px solid var(--accent);padding:8px 12px;border-radius:3px;font-size:14px;margin:8px 0}
+  label{font-size:13px;color:var(--ink-soft);display:block;margin-bottom:4px}
+  select,button{font-family:var(--fb);font-size:15px;border:1px solid var(--rule);border-radius:4px;padding:8px 10px;background:var(--panel);color:var(--ink);width:100%}
+  button{cursor:pointer;background:var(--ink);color:var(--panel);border-color:var(--ink);width:auto;padding:9px 18px}
+  button:hover{opacity:.88}
+  button:disabled{opacity:.5;cursor:default}
+  .date-row{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--rule);border-radius:6px;margin-bottom:8px}
+  .date-row .pick{display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;user-select:none}
+  .date-row .box{width:20px;height:20px;border:2px solid var(--rule);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+  .date-row.on .box{background:var(--ok);border-color:var(--ok);color:#fff}
+  .date-row .dlabel{font-size:15px}
+  .date-row .dtag{font-size:11px;color:var(--ink-soft);margin-left:2px}
+  .dir-toggle{font-size:13px;border:1px solid var(--rule);border-radius:16px;padding:4px 12px;cursor:pointer;user-select:none;white-space:nowrap;color:var(--ink-soft)}
+  .dir-toggle.home{background:var(--home-bg);border-color:var(--home);color:var(--home);font-weight:600}
+  .date-row.off .dir-toggle{visibility:hidden}
+  .date-row.dead{background:var(--dead);opacity:.6;pointer-events:none}
+  .date-row.dead .box{border-style:dashed}
+  .date-row.dead .dead-tag{font-size:12px;color:var(--bad);white-space:nowrap}
+  .declined-row{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px}
+  .list-item{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--rule);border-radius:4px;margin-bottom:8px;cursor:pointer;background:var(--panel)}
+  .list-item:hover{border-color:var(--accent)}
+  .list-item .who{font-weight:600}
+  .list-item .when{color:var(--ink-soft);font-size:12px}
+  .banner{padding:10px 14px;border-radius:4px;margin-bottom:14px;font-size:14px}
+  .banner.ok{background:#eaf3ee;color:#215c38}
+  .banner.err{background:#f8ebe8;color:#7a2c1c}
+  .loading,.err-box{padding:36px 0;text-align:center;color:var(--ink-soft)}
+  .muted{color:var(--ink-soft);font-size:13px}
+  a.back{font-size:13px;color:var(--accent);cursor:pointer;display:inline-block;margin-bottom:10px}
+  .hint{font-size:12px;color:var(--ink-soft);margin:2px 0 10px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="loading">Loading…</div></div>
+<script>
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get('k') || '';
+const MSG = params.get('m') || '';
+const API = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
+const app = document.getElementById('app');
+
+let ctx = null, chosenCanvass = null, declined = false;
+const state = new Map(); // date -> {kind, picked, home}
+
+function ord(n){const s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+function fmtSun(d){const dt=new Date(d+'T00:00:00');return dt.toLocaleDateString('en-GB',{weekday:'short'})+' '+ord(dt.getDate())+' '+dt.toLocaleDateString('en-GB',{month:'short'});}
+function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+async function load(){
+  if(!TOKEN){app.innerHTML='<h1>Record canvass reply</h1><div class="err-box">This page needs a valid link (missing token).</div>';return;}
+  const q = MSG ? `?k=${encodeURIComponent(TOKEN)}&m=${encodeURIComponent(MSG)}` : `?k=${encodeURIComponent(TOKEN)}`;
+  try{
+    const res = await fetch(`${API}/record-reply-data${q}`);
+    const data = await res.json();
+    if(!data.ok){app.innerHTML=`<h1>Record canvass reply</h1><div class="err-box">${esc(data.message)}</div>`;return;}
+    if(data.mode==='list') renderList(data.inbound);
+    else { ctx = data; renderSingle(); }
+  }catch(e){ app.innerHTML='<h1>Record canvass reply</h1><div class="err-box">Could not reach the server.</div>'; }
+}
+
+function renderList(inbound){
+  app.innerHTML = `<h1>Record canvass reply</h1>
+    <p class="sub">Pick the reply you want to record.</p>
+    ${inbound.length? inbound.map(m=>`
+      <div class="list-item" onclick="location.search='?k=${encodeURIComponent(TOKEN)}&m=${m.id}'">
+        <div><div class="who">${esc(m.speaker_name||m.from_number)}</div>
+          <div class="muted">${esc((m.body||'').slice(0,80))}</div></div>
+        <div class="when">${new Date(m.received_at).toLocaleString('en-GB')}</div>
+      </div>`).join('') : '<div class="muted">No recent inbound replies found.</div>'}`;
+}
+
+function renderSingle(){
+  const speakerLine = ctx.speaker_name
+    ? `<strong>${esc(ctx.speaker_name)}</strong>`
+    : `<strong>Unknown number</strong> (${esc(ctx.message.from_number)}) — no speaker matched`;
+  app.innerHTML = `
+    <a class="back" onclick="location.search='?k=${encodeURIComponent(TOKEN)}'">&larr; back to list</a>
+    <h1>Record canvass reply</h1>
+    <div class="card">
+      <div>From: ${speakerLine}</div>
+      <div class="msg-quote">${esc(ctx.message.body||'(no text)')}</div>
+      <div class="muted">${new Date(ctx.message.received_at).toLocaleString('en-GB')}</div>
+    </div>
+    ${ctx.speaker_id ? `
+    <div class="card">
+      <label>Which canvass is this reply for?</label>
+      <select id="canvassSel">
+        <option value="">Select month…</option>
+        ${ctx.candidates.map(c=>`<option value="${c.scheduled_canvass_id}">${esc(c.month_label)}${c.partner?' — '+esc(c.partner):''}</option>`).join('')}
+      </select>
+      <div id="dateArea"></div>
+      <div id="banner"></div>
+      <div style="margin-top:14px"><button id="saveBtn" disabled>Record reply</button></div>
+    </div>` : `<div class="banner err">This number isn't matched to a speaker, so a reply can't be recorded against them. Add the number to the speaker first.</div>`}
+  `;
+  if(ctx.speaker_id){
+    document.getElementById('canvassSel').addEventListener('change', onCanvassPick);
+    document.getElementById('saveBtn').addEventListener('click', save);
+  }
+}
+
+function onCanvassPick(e){
+  const id = e.target.value;
+  chosenCanvass = ctx.candidates.find(c=>c.scheduled_canvass_id===id) || null;
+  declined = false; state.clear();
+  const area = document.getElementById('dateArea');
+  if(!chosenCanvass){ area.innerHTML=''; syncBtn(); return; }
+  // seed state: home dates default to home=true, away default home=false
+  chosenCanvass.sundays.forEach(s=>state.set(s.date,{kind:s.kind,picked:false,home:s.kind==='home'}));
+  area.innerHTML = `
+    <label style="margin-top:14px">Which dates did they offer?</label>
+    <p class="hint">Blocked / non-exchange Sundays are greyed out and can't be selected. Direction is set from the schedule (Away / at DW) — tap it to override if needed.</p>
+    <div id="dates">${chosenCanvass.sundays.map(s=>dateRow(s)).join('')}</div>
+    <div class="declined-row"><input type="checkbox" id="declinedBox"><label for="declinedBox" style="margin:0">Declined / none this month</label></div>`;
+  area.querySelectorAll('.date-row').forEach(row=>{
+    const d=row.dataset.d, s=state.get(d);
+    if(s.kind==='unavailable') return; // greyed, no handlers
+    row.querySelector('.pick').addEventListener('click',()=>{
+      if(declined) return;
+      s.picked=!s.picked; paintRow(row,s); syncBtn();
+    });
+    row.querySelector('.dir-toggle').addEventListener('click',ev=>{
+      ev.stopPropagation();
+      if(!s.picked||declined) return;
+      s.home=!s.home; paintRow(row,s);
+    });
+  });
+  document.getElementById('declinedBox').addEventListener('change',ev=>{
+    declined=ev.target.checked;
+    area.querySelectorAll('.date-row').forEach(row=>{
+      const s=state.get(row.dataset.d);
+      if(s.kind==='unavailable') return;
+      if(declined){s.picked=false;} paintRow(row,s);
+      row.style.opacity=declined?.45:1; row.style.pointerEvents=declined?'none':'auto';
+    });
+    syncBtn();
+  });
+  syncBtn();
+}
+
+function dateRow(s){
+  if(s.kind==='unavailable'){
+    return `<div class="date-row dead" data-d="${s.date}">
+      <div class="pick"><span class="box"></span><span class="dlabel">${fmtSun(s.date)}</span></div>
+      <span class="dead-tag">blocked</span></div>`;
+  }
+  const tag = s.kind==='home' ? '<span class="dtag">(home date)</span>' : '';
+  return `<div class="date-row off" data-d="${s.date}">
+    <div class="pick"><span class="box"></span><span class="dlabel">${fmtSun(s.date)}</span>${tag}</div>
+    <span class="dir-toggle">Away</span>
+  </div>`;
+}
+function paintRow(row,s){
+  row.classList.toggle('on',s.picked);
+  row.classList.toggle('off',!s.picked);
+  row.querySelector('.box').textContent = s.picked?'✓':'';
+  const t=row.querySelector('.dir-toggle');
+  t.classList.toggle('home',s.home);
+  t.textContent = s.home?'at DW ✓':'Away';
+}
+function syncBtn(){
+  const btn=document.getElementById('saveBtn'); if(!btn) return;
+  const any=[...state.values()].some(s=>s.picked);
+  btn.disabled = !chosenCanvass || (!declined && !any);
+}
+
+async function save(){
+  const btn=document.getElementById('saveBtn'); btn.disabled=true;
+  const banner=document.getElementById('banner');
+  const offered=[...state.entries()].filter(([,s])=>s.picked).map(([date,s])=>({date,home:s.home}));
+  try{
+    const res=await fetch(`${API}/record-reply-submit`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        token:TOKEN, scheduled_canvass_id:chosenCanvass.scheduled_canvass_id,
+        speaker_id:ctx.speaker_id, raw_message_id:ctx.message.id, offered, declined
+      })
+    });
+    const data=await res.json();
+    if(!data.ok){banner.innerHTML=`<div class="banner err">${esc(data.message)}</div>`;btn.disabled=false;return;}
+    let extra;
+    if(declined){ extra='as declined'; }
+    else {
+      const bits=[];
+      if(data.proposed_inserted) bits.push(`${data.proposed_inserted} added`);
+      if(data.proposed_kept) bits.push(`${data.proposed_kept} unchanged`);
+      if(data.proposed_removed) bits.push(`${data.proposed_removed} removed`);
+      if(data.skipped_already_confirmed) bits.push(`${data.skipped_already_confirmed} already confirmed`);
+      extra=bits.join(', ')||'no slot changes';
+    }
+    banner.innerHTML=`<div class="banner ok">Recorded for ${esc(ctx.speaker_name)}, ${esc(chosenCanvass.month_label)} — ${extra}.</div>`;
+  }catch(e){ banner.innerHTML='<div class="banner err">Could not reach the server.</div>'; btn.disabled=false; }
+}
+
+load();
+</script>
+</body>
+</html>
