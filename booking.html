@@ -98,6 +98,7 @@ const params = new URLSearchParams(location.search);
 const TOKEN = params.get('t') || '';
 const URL_MODE = params.get('mode');
 const URL_MX = params.get('mx');
+const URL_CLAIM = params.get('claim'); // round-robin: freed month to highlight, YYYY-MM-01
 const API = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
 const app = document.getElementById('app');
 
@@ -112,6 +113,7 @@ let expandedBooking = null; // mx_id currently expanded in current-bookings
 let scrolledToSpeakers = false;
 
 function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function monthLabelFromValue(v){const M=['January','February','March','April','May','June','July','August','September','October','November','December'];const [y,m]=v.split('-').map(Number);return `${M[m-1]} ${y}`;}
 
 async function load(year, previewMonth){
   if(!TOKEN){app.innerHTML='<h1>Book an exchange</h1><div class="err-box">This page needs a valid link. Check the email you were sent, or ask Matt for a fresh one.</div>';return;}
@@ -141,10 +143,20 @@ function render(){
 
 function renderHub(){
   const na = data.next_available;
+  const claimMonth = URL_CLAIM && data.calendar_year ? URL_CLAIM : null;
+  const claimLabel = claimMonth ? monthLabelFromValue(claimMonth) : null;
   app.innerHTML = `
     <h1>${esc(data.cong_name)}</h1>
     <p class="sub">Booking with Darlington West. Link valid until ${esc(data.valid_until)}.</p>
     <div id="banner"></div>
+
+    ${claimMonth ? `
+    <div class="hero" style="background:#fbeee6;border-color:#e8c9a8">
+      <div class="eyebrow" style="color:#b4632a">⚡ Date just opened up</div>
+      <h2 style="color:#b4632a">${esc(claimLabel)} is available</h2>
+      <div class="open-count">A congregation cancelled, so this month is free for an exchange — first come, first served.</div>
+      <button id="claimBook">Claim ${esc(claimLabel)}</button>
+    </div>` : ''}
 
     ${na ? `
     <div class="hero">
@@ -186,6 +198,8 @@ function renderHub(){
   `;
 
   document.getElementById('detailsLink').addEventListener('click', ()=>{ view={mode:'details'}; render(); scrollToTop(); });
+  const claimBtn = document.getElementById('claimBook');
+  if(claimBtn) claimBtn.addEventListener('click', ()=>submitBooking(URL_CLAIM));
   if(na) document.getElementById('heroBook').addEventListener('click', ()=>submitBooking(na.value));
   document.getElementById('calPrev').addEventListener('click', ()=>{ calYear--; load(calYear); });
   document.getElementById('calNext').addEventListener('click', ()=>{ calYear++; load(calYear); });
@@ -266,7 +280,7 @@ function renderBookingDetail(){
   area.innerHTML = `
     <span class="detail-status ${b.status}">${b.status==='pencilled'?'Pencilled':'Confirmed'}</span>
     <div class="check-row ${checkDone?'done':'pending'}">
-      ${checkDone ? '✓ You\\'ve confirmed your blocked dates for this month' : '⚠ Blocked dates not yet confirmed for this month'}
+      ${checkDone ? '✓ Your blocked dates are confirmed for this month' : '⚠ Blocked dates not yet confirmed for this month'}
     </div>
     ${b.sundays.map(s=>`
       <div class="slot-row">
