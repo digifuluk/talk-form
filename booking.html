@@ -108,9 +108,9 @@ let selectedPreviewMonth = null;
 let view = URL_MODE === 'cancel' && URL_MX ? { mode: 'cancel', mx: URL_MX }
          : URL_MODE === 'details' ? { mode: 'details' }
          : { mode: 'hub' };
-if (URL_MODE === 'speakers' && URL_MX) expandedBooking = URL_MX;
 let expandedBooking = null; // mx_id currently expanded in current-bookings
 let scrolledToSpeakers = false;
+if (URL_MODE === 'speakers' && URL_MX) expandedBooking = URL_MX;
 
 function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function monthLabelFromValue(v){const M=['January','February','March','April','May','June','July','August','September','October','November','December'];const [y,m]=v.split('-').map(Number);return `${M[m-1]} ${y}`;}
@@ -124,7 +124,21 @@ async function load(year, previewMonth){
     const res = await fetch(`${API}/booking-options${q}`);
     const json = await res.json();
     if(!json.ok){
-      app.innerHTML = `<h1>Book an exchange</h1><div class="err-box">${esc(json.message||"This link isn't valid or has expired. Ask Matt for a fresh one.")}</div>`;
+      app.innerHTML = `<h1>Book an exchange</h1>
+        <div class="err-box">${esc(json.message||"This link isn't valid or has expired.")}</div>
+        <div style="text-align:center;margin-top:6px">
+          <button id="refreshLinkBtn" class="secondary">Email me a fresh link</button>
+          <div id="refreshMsg" class="sub" style="margin-top:10px"></div>
+        </div>`;
+      const rb = document.getElementById('refreshLinkBtn');
+      if(rb) rb.addEventListener('click', async ()=>{
+        rb.disabled = true;
+        try{
+          const r = await fetch(`${API}/booking-refresh-link`, { method:'POST', body: new URLSearchParams({ t: TOKEN }) });
+          const j = await r.json();
+          document.getElementById('refreshMsg').textContent = j.message || 'Done.';
+        }catch(e){ document.getElementById('refreshMsg').textContent = 'Could not reach the server — try again shortly.'; rb.disabled = false; }
+      });
       return;
     }
     data = json;
