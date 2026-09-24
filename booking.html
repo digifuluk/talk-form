@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
+<title>Exchanges — Darlington West</title>
+<style>
+  :root{
+    --paper:#f1f3f5;--panel:#fff;--ink:#1b2430;--ink-soft:#4c5766;--rule:#d7dbe0;
+    --ok:#2f7a4d;--ok-bg:#eaf3ee;--bad:#b4432f;--bad-bg:#f8ebe8;--accent:#2f5d7a;--accent-bg:#eaf1f5;
+    --green:#2f7a4d;--green-bg:#eaf3ee;--red:#b4432f;--red-bg:#fbeae7;
+    --taken:#c65f4f;--taken-bg:#fbeae7;--cooldown:#c68a3f;--cooldown-bg:#fbf1e0;
+    --avail-bg:#eef6f0;--past-bg:#eceef0;--past-ink:#9aa3ad;--claim:#b4632a;--claim-bg:#fbeee6;
+    --fh:Georgia,'Iowan Old Style','Times New Roman',serif;
+    --fb:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--fb);font-size:15px;line-height:1.5}
+  .wrap{max-width:660px;margin:0 auto;padding:24px 16px 80px}
+  h1{font-family:var(--fh);font-weight:400;font-size:25px;margin:0 0 4px}
+  .sub{color:var(--ink-soft);font-size:13px;margin:0 0 20px}
+  h3{font-family:var(--fh);font-weight:400;font-size:17px;margin:0 0 8px}
+  button{font-family:var(--fb);font-size:15px;border:1px solid var(--ink);border-radius:6px;padding:10px 18px;background:var(--ink);color:#fff;cursor:pointer}
+  button:hover{opacity:.9}
+  button:disabled{opacity:.45;cursor:default}
+  button.secondary{background:var(--panel);color:var(--ink);border-color:var(--rule)}
+  button.small{padding:6px 12px;font-size:13px}
+  button.green{background:var(--green);border-color:var(--green)}
+  button.red{background:var(--red);border-color:var(--red)}
+  button.redlight{background:var(--red-bg);border-color:#e6b9b0;color:var(--red)}
+  textarea,input[type=text],select{width:100%;font-family:var(--fb);font-size:15px;border:1px solid var(--rule);border-radius:6px;padding:9px 11px;background:var(--panel);color:var(--ink)}
+  label{font-size:13px;color:var(--ink-soft);display:block;margin-bottom:5px}
+  .loading,.err-box{padding:40px 0;text-align:center;color:var(--ink-soft)}
+  .banner{padding:11px 14px;border-radius:6px;margin-bottom:16px;font-size:14px}
+  .banner.ok{background:var(--ok-bg);color:var(--ok)}
+  .banner.err{background:var(--bad-bg);color:var(--bad)}
+
+  /* Accordion containers */
+  .acc{background:var(--panel);border:1px solid var(--rule);border-radius:8px;margin-bottom:16px;overflow:hidden}
+  .acc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;cursor:pointer;user-select:none}
+  .acc-head h2{font-family:var(--fh);font-weight:400;font-size:19px;margin:0}
+  .acc-chevron{transition:transform .2s ease;color:var(--ink-soft);font-size:13px;flex:none}
+  .acc.open .acc-chevron{transform:rotate(90deg)}
+  .acc-body{display:none;padding:0 20px 20px}
+  .acc.open .acc-body{display:block}
+  .acc-body .sub-first{margin-top:0}
+
+  .subsection{margin-top:18px;padding-top:18px;border-top:1px solid var(--rule)}
+
+  /* Hero (next available / claim) */
+  .hero{background:var(--accent-bg);border:1px solid #c9dae3;border-radius:8px;padding:18px;margin-bottom:16px}
+  .hero .eyebrow{font-size:12px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+  .hero h4{font-family:var(--fh);font-weight:400;font-size:18px;color:var(--accent);margin:0 0 2px}
+  .hero .open-count{font-size:13px;color:var(--ink-soft);margin-bottom:14px}
+  .hero.claim{background:var(--claim-bg);border-color:#e8c9a8}
+  .hero.claim .eyebrow,.hero.claim h4{color:var(--claim)}
+
+  /* Calendar */
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .cal-year{font-family:var(--fh);font-size:18px}
+  .cal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .cal-month{border-radius:6px;padding:12px 8px;text-align:center;font-size:14px;cursor:pointer;border:1px solid transparent;user-select:none}
+  .cal-month.available{background:var(--avail-bg);border-color:#cfe3d5}
+  .cal-month.taken{background:var(--taken-bg);color:var(--taken);cursor:default}
+  .cal-month.cooldown{background:var(--cooldown-bg);color:var(--cooldown);cursor:default}
+  .cal-month.past{background:var(--past-bg);color:var(--past-ink);cursor:default}
+  .cal-month.selected{outline:2px solid var(--accent);outline-offset:1px}
+  .cal-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink-soft);margin-top:12px}
+  .cal-legend span{display:inline-flex;align-items:center;gap:5px}
+  .cal-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+  .preview{margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
+  .sun-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px;border-bottom:1px solid #eef0f2}
+  .sun-row:last-child{border-bottom:none}
+  .sun-row .blocked{color:var(--bad);font-size:12.5px}
+
+  select.booking-select{margin-bottom:14px}
+  .detail-status{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:10px;margin-bottom:12px}
+  .detail-status.pencilled{background:var(--cooldown-bg);color:var(--cooldown)}
+  .detail-status.pairing_confirmed{background:var(--ok-bg);color:var(--ok)}
+  .check-row{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-bottom:14px;padding:9px 12px;border-radius:6px}
+  .check-row.done{background:var(--ok-bg);color:var(--ok)}
+  .check-row.pending{background:var(--cooldown-bg);color:var(--cooldown)}
+  .slot-row{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid #eef0f2;font-size:14px;gap:10px}
+  .slot-row:last-child{border-bottom:none}
+  .slot-tag{font-size:11.5px;color:var(--ink-soft)}
+  .slot-tag.blocked{color:var(--bad)}
+  .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .row select{flex:1;min-width:120px}
+  .row input{flex:2;min-width:150px}
+  .muted{color:var(--ink-soft);font-size:13px}
+  .cancel-detail{background:var(--red-bg);border:1px solid #e6b9b0;border-radius:6px;padding:12px 14px;font-size:14px;margin:12px 0}
+  a.link-btn{font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline}
+
+  @media (max-width:480px){ .cal-grid{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="loading">Loading…</div></div>
+<script>
+const params = new URLSearchParams(location.search);
+const TOKEN = params.get('t') || '';
+const URL_MODE = params.get('mode');   // speakers | cancel | details
+const URL_MX = params.get('mx');
+const URL_CLAIM = params.get('claim'); // round-robin freed month YYYY-MM-01
+const API = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
+const app = document.getElementById('app');
+
+let data = null;
+let calYear = null;
+let selectedPreviewMonth = null;
+let expandedBooking = null;   // mx_id selected in container 1
+let cancelBooking = null;     // mx_id selected in container 3
+let openSet = new Set();      // which accordion containers are open: 'bookings'|'new'|'cancel'
+let didInitScroll = false;
+let view = 'hub';             // 'hub' | 'details'
+if (URL_MODE === 'details') view = 'details';
+if (URL_MODE === 'speakers' && URL_MX) expandedBooking = URL_MX;
+if (URL_MODE === 'cancel' && URL_MX) cancelBooking = URL_MX;
+
+function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function monthLabelFromValue(v){const M=['January','February','March','April','May','June','July','August','September','October','November','December'];const [y,m]=v.split('-').map(Number);return `${M[m-1]} ${y}`;}
+
+async function load(year, previewMonth){
+  if(!TOKEN){app.innerHTML='<h1>Exchanges</h1><div class="err-box">This page needs a valid link. Check the email you were sent, or ask Matt for a fresh one.</div>';return;}
+  let q = `?t=${encodeURIComponent(TOKEN)}`;
+  if(year) q += `&year=${year}`;
+  if(previewMonth) q += `&preview_month=${previewMonth}`;
+  try{
+    const res = await fetch(`${API}/booking-options${q}`);
+    const json = await res.json();
+    if(!json.ok){
+      app.innerHTML = `<h1>Exchanges</h1>
+        <div class="err-box">${esc(json.message||"This link isn't valid or has expired.")}</div>
+        <div style="text-align:center;margin-top:6px">
+          <button id="refreshLinkBtn" class="secondary">Email me a fresh link</button>
+          <div id="refreshMsg" class="sub" style="margin-top:10px"></div>
+        </div>`;
+      const rb = document.getElementById('refreshLinkBtn');
+      if(rb) rb.addEventListener('click', async ()=>{
+        rb.disabled = true;
+        try{
+          const r = await fetch(`${API}/booking-refresh-link`, { method:'POST', body: new URLSearchParams({ t: TOKEN }) });
+          const j = await r.json();
+          document.getElementById('refreshMsg').textContent = j.message || 'Done.';
+        }catch(e){ document.getElementById('refreshMsg').textContent = 'Could not reach the server — try again shortly.'; rb.disabled = false; }
+      });
+      return;
+    }
+    data = json;
+    if(!calYear) calYear = json.calendar_year.year;
+    render();
+  }catch(e){
+    app.innerHTML = '<h1>Exchanges</h1><div class="err-box">Could not reach the server.</div>';
+  }
+}
+
+function initialOpenSet(){
+  const s = new Set();
+  if(URL_MODE === 'speakers' || (URL_MODE === null && URL_CLAIM === null && data.current_exchanges.length)) s.add('bookings');
+  if(URL_MODE === 'cancel') s.add('cancel');
+  if(URL_CLAIM || (URL_MODE === null && !data.current_exchanges.length)) s.add('new');
+  if(s.size === 0) s.add('bookings');
+  return s;
+}
+
+function render(){
+  if(view === 'details'){ renderDetails(); return; }
+  if(openSet.size === 0) openSet = initialOpenSet();
+  renderHub();
+}
+
+function accHead(key, label){
+  const open = openSet.has(key);
+  return `<div class="acc-head" data-acc="${key}"><h2>${label}</h2><span class="acc-chevron">▶</span></div>`;
+}
+
+function renderHub(){
+  const na = data.next_available;
+  const claimMonth = URL_CLAIM || null;
+  const claimLabel = claimMonth ? monthLabelFromValue(claimMonth) : null;
+
+  app.innerHTML = `
+    <h1>Exchanges with ${esc(data.cong_name)}</h1>
+    <p class="sub">Manage your public talk exchanges with Darlington West. Link valid until ${esc(data.valid_until)}.</p>
+    <div id="banner"></div>
+
+    <!-- Container 1 -->
+    <div class="acc ${openSet.has('bookings')?'open':''}" id="acc-bookings">
+      ${accHead('bookings','🗓️ Current bookings & unavailable dates')}
+      <div class="acc-body">
+        <label class="sub-first">Your current bookings with us</label>
+        ${data.current_exchanges.length ? `
+          <select class="booking-select" id="bookingSelect">
+            <option value="">Select a month…</option>
+            ${data.current_exchanges.map(b=>`<option value="${b.mx_id}" ${expandedBooking===b.mx_id?'selected':''}>${esc(b.month_label)} — ${b.status==='pencilled'?'Pencilled, awaiting confirmation':'Confirmed'}</option>`).join('')}
+          </select>
+          <div id="bookingDetail"></div>
+
+          <div class="subsection">
+            <h3>🚫 Flag a date you can't send a speaker</h3>
+            <div id="blockedArea"></div>
+          </div>
+
+          <div class="subsection">
+            <h3>👤 Add speakers and talks</h3>
+            <div id="speakerArea"></div>
+          </div>
+        ` : `<p class="muted">Nothing currently booked with us.</p>`}
+      </div>
+    </div>
+
+    <!-- Container 2 -->
+    <div class="acc ${openSet.has('new')?'open':''}" id="acc-new">
+      ${accHead('new','⊕ New booking')}
+      <div class="acc-body">
+        ${claimMonth ? `
+        <div class="hero claim">
+          <div class="eyebrow">⚡ Date just opened up</div>
+          <h4>${esc(claimLabel)} is available</h4>
+          <div class="open-count">A congregation cancelled, so this month is free — first come, first served.</div>
+          <button class="green" id="claimBook">⊕ Request ${esc(claimLabel)}</button>
+        </div>` : ''}
+
+        ${na ? `
+        <div class="hero">
+          <div class="eyebrow">Next available month</div>
+          <h4>${esc(na.label)}</h4>
+          <div class="open-count">${na.open_count} of the month's Sundays currently open</div>
+          <button class="green" id="heroBook">⊕ Request ${esc(na.label)}</button>
+        </div>` : `<p class="muted">No open months found in the next 6 years — that shouldn't happen, let Matt know.</p>`}
+
+        <label>Or pick a different month</label>
+        <div class="cal-nav">
+          <button class="secondary small" id="calPrev">&larr; ${calYear-1}</button>
+          <div class="cal-year">${calYear}</div>
+          <button class="secondary small" id="calNext">${calYear+1} &rarr;</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-legend">
+          <span><i style="background:var(--avail-bg);border:1px solid #cfe3d5"></i>Open</span>
+          <span><i style="background:var(--taken-bg)"></i>Already exchanging</span>
+          <span><i style="background:var(--cooldown-bg)"></i>Too close to another exchange</span>
+          <span><i style="background:var(--past-bg)"></i>Past</span>
+        </div>
+        <div id="previewArea"></div>
+      </div>
+    </div>
+
+    <!-- Container 3 -->
+    <div class="acc ${openSet.has('cancel')?'open':''}" id="acc-cancel">
+      ${accHead('cancel','❌ Request cancellation')}
+      <div class="acc-body">
+        <p class="muted sub-first">Please note cancellations cause logistical challenges and should only be requested for exceptional reasons. Once a cancellation is approved, the relevant month is immediately offered to other congregations to book.</p>
+        ${data.current_exchanges.length ? `
+          <label>Which booking do you need to cancel?</label>
+          <select class="booking-select" id="cancelSelect">
+            <option value="">Select a month…</option>
+            ${data.current_exchanges.map(b=>`<option value="${b.mx_id}" ${cancelBooking===b.mx_id?'selected':''}>${esc(b.month_label)}</option>`).join('')}
+          </select>
+          <div id="cancelDetail"></div>
+        ` : `<p class="muted">You have no bookings to cancel.</p>`}
+      </div>
+    </div>
+
+    <p class="sub" style="text-align:center"><a class="link-btn" id="detailsLink">Update your congregation's coordinator, email or phone details</a></p>
+  `;
+
+  // Accordion toggles (independent — opening one never closes others).
+  app.querySelectorAll('.acc-head').forEach(h=>{
+    h.addEventListener('click', ()=>{
+      const key = h.dataset.acc;
+      const accEl = document.getElementById('acc-'+key);
+      if(openSet.has(key)){ openSet.delete(key); accEl.classList.remove('open'); }
+      else { openSet.add(key); accEl.classList.add('open'); }
+    });
+  });
+
+  document.getElementById('detailsLink').addEventListener('click', ()=>{ view='details'; render(); scrollToTop(); });
+  const claimBtn = document.getElementById('claimBook');
+  if(claimBtn) claimBtn.addEventListener('click', (e)=>submitBooking(URL_CLAIM, e));
+  if(na){ const hb=document.getElementById('heroBook'); if(hb) hb.addEventListener('click',(e)=>submitBooking(na.value,e)); }
+  document.getElementById('calPrev').addEventListener('click', ()=>{ calYear--; load(calYear); });
+  document.getElementById('calNext').addEventListener('click', ()=>{ calYear++; load(calYear); });
+  renderCalGrid();
+  if(selectedPreviewMonth) renderPreview();
+
+  const sel = document.getElementById('bookingSelect');
+  if(sel){
+    sel.addEventListener('change', e=>{ expandedBooking = e.target.value || null; renderBookingDetail(); renderBlockedArea(); renderSpeakerArea(); });
+    renderBookingDetail(); renderBlockedArea(); renderSpeakerArea();
+  }
+  const csel = document.getElementById('cancelSelect');
+  if(csel){
+    csel.addEventListener('change', e=>{ cancelBooking = e.target.value || null; renderCancelDetail(); });
+    renderCancelDetail();
+  }
+
+  if(!didInitScroll){
+    didInitScroll = true;
+    const target = URL_MODE==='speakers' ? 'speakerArea' : URL_MODE==='cancel' ? 'acc-cancel' : URL_CLAIM ? 'acc-new' : null;
+    if(target) setTimeout(()=>{ const el=document.getElementById(target); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60);
+  }
+}
+
+function renderCalGrid(){
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = data.calendar_year.months.map(m=>{
+    const isSelected = selectedPreviewMonth === m.value;
+    return `<div class="cal-month ${m.status}${isSelected?' selected':''}" data-value="${m.value}">${m.label}</div>`;
+  }).join('');
+  grid.querySelectorAll('.cal-month.available').forEach(el=>{
+    el.addEventListener('click', ()=>{ selectedPreviewMonth = el.dataset.value; load(calYear, selectedPreviewMonth); });
+  });
+}
+
+function renderPreview(){
+  const area = document.getElementById('previewArea'); if(!area) return;
+  const mp = data.month_preview;
+  if(!mp){ area.innerHTML=''; return; }
+  area.innerHTML = `
+    <div class="preview">
+      <h3>${esc(mp.label)}</h3>
+      ${mp.sundays.map(s=>`<div class="sun-row"><span>${esc(s.label)}</span>${s.blocked?`<span class="blocked">blocked — ${esc(s.reason)}${s.source==='own'?' (already on file for you)':''}</span>`:'<span style="color:var(--ok)">open</span>'}</div>`).join('')}
+      <div class="row" style="margin-top:12px">
+        <button class="green" id="previewBook">⊕ Request ${esc(mp.label)}</button>
+        <button class="secondary" id="previewClose">Close</button>
+      </div>
+    </div>`;
+  document.getElementById('previewBook').addEventListener('click', (e)=>submitBooking(mp.value, e));
+  document.getElementById('previewClose').addEventListener('click', ()=>{ selectedPreviewMonth=null; render(); });
+}
+
+async function submitBooking(month, ev){
+  const btn = ev && ev.target ? ev.target : null; if(btn) btn.disabled = true;
+  try{
+    const res = await fetch(`${API}/booking-submit`, { method:'POST', body: new URLSearchParams({ t: TOKEN, month, blocked: '[]' }) });
+    const j = await res.json();
+    banner(j.ok, j.message);
+    if(j.ok){ selectedPreviewMonth=null; await load(calYear); scrollToTop(); }
+    else if(btn) btn.disabled = false;
+  }catch(e){ banner(false, 'Could not reach the server.'); if(btn) btn.disabled=false; }
+}
+
+const SLOT_LABEL = {
+  no_speaker:'No speaker needed', dw_local:'DW has a local speaker — nothing needed from you',
+  two_way:'Exchange both ways', visiting_only:'DW speaker visiting you', sending_only:'Your speaker visiting DW',
+};
+function describeSlot(s){
+  if(s.blocked_reason) return SLOT_LABEL[s.kind] || '';
+  if(s.kind === 'two_way') return [s.visiting_speaker?`DW: ${s.visiting_speaker}`:'DW: open', s.sending_speaker?`You: ${s.sending_speaker}`:'You: open'].join(' · ');
+  if(s.kind === 'visiting_only') return s.visiting_speaker ? `DW: ${s.visiting_speaker}` : 'DW speaker — open';
+  if(s.kind === 'sending_only') return s.sending_speaker ? `You: ${s.sending_speaker}` : 'Your speaker — open';
+  return SLOT_LABEL[s.kind] || '';
+}
+function selectedBooking(){ return data.current_exchanges.find(x=>x.mx_id===expandedBooking) || null; }
+
+function renderBookingDetail(){
+  const area = document.getElementById('bookingDetail'); if(!area) return;
+  const b = selectedBooking();
+  if(!b){ area.innerHTML=''; return; }
+  const checkDone = b.blocked_dates_partner_check;
+  area.innerHTML = `
+    <span class="detail-status ${b.status}">${b.status==='pencilled'?'Pencilled':'Confirmed'}</span>
+    <div class="check-row ${checkDone?'done':'pending'}">
+      ${checkDone ? '✓ Your blocked dates are confirmed for this month' : '⚠ Blocked dates not yet confirmed for this month'}
+    </div>
+    ${b.sundays.map(s=>`
+      <div class="slot-row"><span>${esc(s.label)}</span>
+        <span class="slot-tag ${s.kind}">${s.blocked_reason ? esc(s.blocked_reason)+' — ' : ''}${esc(describeSlot(s))}</span>
+      </div>`).join('')}`;
+}
+
+function renderBlockedArea(){
+  const area = document.getElementById('blockedArea'); if(!area) return;
+  const b = selectedBooking();
+  if(!b){ area.innerHTML='<p class="muted">Select one of your bookings above first.</p>'; return; }
+  const checkDone = b.blocked_dates_partner_check;
+  area.innerHTML = `
+    <div class="row">
+      <select id="blockDate"><option value="">Pick a Sunday…</option>
+        ${b.sundays.filter(s=>!s.blocked_reason).map(s=>`<option value="${s.date}">${esc(s.label)}</option>`).join('')}
+      </select>
+      <input type="text" id="blockNote" placeholder="Reason (optional)">
+    </div>
+    <button class="redlight small" id="addBlockBtn">🚫 Add blocked date</button>
+    ${!checkDone ? `<button class="secondary small" id="confirmDoneBtn" style="margin-left:8px">Confirm — that's everything blocked</button>` : ''}`;
+  document.getElementById('addBlockBtn').addEventListener('click', async ()=>{
+    const date = document.getElementById('blockDate').value;
+    const note = document.getElementById('blockNote').value;
+    if(!date){ banner(false,'Pick a Sunday first.'); return; }
+    const btn=document.getElementById('addBlockBtn'); btn.disabled=true;
+    try{
+      const res=await fetch(`${API}/booking-blocked-date`,{method:'POST',body:new URLSearchParams({t:TOKEN,mx:expandedBooking,action:'add',date,note})});
+      const j=await res.json(); banner(j.ok,j.message); if(j.ok) await load(calYear);
+    }catch(e){ banner(false,'Could not reach the server.'); } btn.disabled=false;
+  });
+  const cb=document.getElementById('confirmDoneBtn');
+  if(cb) cb.addEventListener('click', async ()=>{
+    cb.disabled=true;
+    try{
+      const res=await fetch(`${API}/booking-blocked-date`,{method:'POST',body:new URLSearchParams({t:TOKEN,mx:expandedBooking,action:'confirm'})});
+      const j=await res.json(); banner(j.ok,j.message); if(j.ok) await load(calYear);
+    }catch(e){ banner(false,'Could not reach the server.'); cb.disabled=false; }
+  });
+}
+
+function renderSpeakerArea(){
+  const area = document.getElementById('speakerArea'); if(!area) return;
+  const b = selectedBooking();
+  if(!b){ area.innerHTML='<p class="muted">Select one of your bookings above first.</p>'; return; }
+  const openF3 = b.sundays.filter(s => !s.blocked_reason && (s.kind==='two_way'||s.kind==='sending_only') && !s.sending_speaker);
+  if(!openF3.length){ area.innerHTML='<p class="muted">No dates currently need a speaker from your side for this month.</p>'; return; }
+  area.innerHTML = `
+    <p class="muted">Please select from the dropdown — only type a name if your speaker isn't listed.</p>
+    ${openF3.map(s=>`
+      <div class="spk-row" data-date="${s.date}" style="border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px">
+        <div style="font-size:13.5px;font-weight:600;margin-bottom:6px">${esc(s.label)}</div>
+        <select class="spk-select" data-date="${s.date}">
+          <option value="">Select speaker…</option>
+          ${data.partner_speakers.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+          <option value="__new__">— Speaker not listed —</option>
+        </select>
+        <input type="text" class="spk-name" data-date="${s.date}" placeholder="Speaker's name" style="display:none;margin-top:8px">
+        <select class="spk-talk" data-date="${s.date}" style="margin-top:8px"><option value="">Select speaker first…</option></select>
+        <div class="spk-error" data-date="${s.date}" style="color:var(--bad);font-size:12.5px;margin-top:6px;display:none"></div>
+      </div>`).join('')}
+    <button class="green" id="submitSpeakersBtn" disabled>👤 Add speakers/talks</button>`;
+  wireSpeakerSection();
+}
+
+function wireSpeakerSection(){
+  const rows=[...document.querySelectorAll('.spk-row')];
+  function talksFor(speakerId,isNew){ if(isNew) return data.all_active_talks; const p=data.partner_speakers.find(x=>x.id===speakerId); return p?p.talks:[]; }
+  function populateTalks(row,speakerId,isNew){
+    const t=row.querySelector('.spk-talk'); const opts=talksFor(speakerId,isNew);
+    t.innerHTML = opts.length ? `<option value="">Select talk…</option>`+opts.map(n=>`<option value="${n}">${n}</option>`).join('') : `<option value="">No talks on file for this speaker</option>`;
+  }
+  rows.forEach(row=>{
+    const select=row.querySelector('.spk-select'), nameInput=row.querySelector('.spk-name');
+    select.addEventListener('change',()=>{ const isNew=select.value==='__new__'; nameInput.style.display=isNew?'block':'none'; populateTalks(row,select.value,isNew); validateSpeakers(); });
+    nameInput.addEventListener('input',validateSpeakers);
+    row.querySelector('.spk-talk').addEventListener('change',validateSpeakers);
+  });
+  document.getElementById('submitSpeakersBtn').addEventListener('click', async ()=>{
+    const entries=rows.map(row=>{
+      const select=row.querySelector('.spk-select'); const isNew=select.value==='__new__';
+      const talk=row.querySelector('.spk-talk').value; const entry={date:row.dataset.date,talk_number:Number(talk)};
+      if(isNew) entry.new_speaker_name=row.querySelector('.spk-name').value.trim(); else entry.speaker_id=select.value;
+      return entry;
+    }).filter(e=>e.speaker_id||e.new_speaker_name);
+    if(!entries.length) return;
+    const btn=document.getElementById('submitSpeakersBtn'); btn.disabled=true;
+    try{
+      const res=await fetch(`${API}/booking-speaker-talk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:TOKEN,mx:expandedBooking,entries})});
+      const j=await res.json(); banner(j.ok,j.message); if(j.ok) await load(calYear); else btn.disabled=false;
+    }catch(e){ banner(false,'Could not reach the server.'); btn.disabled=false; }
+  });
+  validateSpeakers();
+}
+
+function validateSpeakers(){
+  const rows=[...document.querySelectorAll('.spk-row')]; const submitBtn=document.getElementById('submitSpeakersBtn'); if(!submitBtn) return;
+  const b=selectedBooking();
+  const usedSpk=new Set(), usedTalk=new Set();
+  const filledSpk=new Set(b?b.filled_f3_speaker_ids:[]); const filledTalk=new Set(b?b.filled_f3_talk_numbers:[]);
+  let anyFilled=false, allValid=true;
+  rows.forEach(row=>{
+    const select=row.querySelector('.spk-select'), nameInput=row.querySelector('.spk-name'), talkSel=row.querySelector('.spk-talk'), errEl=row.querySelector('.spk-error');
+    const isNew=select.value==='__new__';
+    if(!select.value && !talkSel.value){ errEl.style.display='none'; return; }
+    anyFilled=true;
+    const hasSpeaker=isNew?nameInput.value.trim().length>1:!!select.value; const hasTalk=!!talkSel.value; let err='';
+    if(!hasSpeaker) err='Select a speaker or enter a name.';
+    else if(!hasTalk) err='Select a talk.';
+    else if(!isNew){ if(filledSpk.has(select.value)||usedSpk.has(select.value)) err='This speaker is already assigned to another date this month.'; else usedSpk.add(select.value); }
+    if(!err && hasTalk){ const tn=Number(talkSel.value); if(filledTalk.has(tn)||usedTalk.has(tn)) err='This talk is already assigned to another date this month.'; else usedTalk.add(tn); }
+    if(err){ errEl.textContent=err; errEl.style.display='block'; allValid=false; } else errEl.style.display='none';
+  });
+  submitBtn.disabled = !(anyFilled && allValid);
+}
+
+function renderCancelDetail(){
+  const area=document.getElementById('cancelDetail'); if(!area) return;
+  const b=data.current_exchanges.find(x=>x.mx_id===cancelBooking);
+  if(!b){ area.innerHTML=''; return; }
+  area.innerHTML = `
+    <div class="cancel-detail">You are cancelling an exchange with Darlington West for <strong>${esc(b.month_label)}</strong>.</div>
+    <label>Reason for cancelling</label>
+    <textarea id="cancelReason" rows="3" placeholder="Let us know what's changed…"></textarea>
+    <div class="row" style="margin-top:12px"><button class="red" id="cancelSubmitBtn">❌ Request cancellation</button></div>`;
+  document.getElementById('cancelSubmitBtn').addEventListener('click', async ()=>{
+    const reason=document.getElementById('cancelReason').value.trim();
+    if(!reason){ banner(false,'A reason is required.'); return; }
+    if(!confirm('Are you sure you want to request cancellation of '+b.month_label+'? This will be reviewed and, once approved, the month offered to other congregations.')) return;
+    const btn=document.getElementById('cancelSubmitBtn'); btn.disabled=true;
+    try{
+      const res=await fetch(`${API}/booking-cancel-request`,{method:'POST',body:new URLSearchParams({t:TOKEN,mx:cancelBooking,reason})});
+      const j=await res.json(); banner(j.ok,j.message); if(j.ok){ cancelBooking=null; await load(calYear); scrollToTop(); } else btn.disabled=false;
+    }catch(e){ banner(false,'Could not reach the server.'); btn.disabled=false; }
+  });
+}
+
+// ── Details view (separate) ────────────────────────────────────────────
+function renderDetails(){
+  app.innerHTML = `
+    <a class="link-btn" id="backLink">&larr; back</a>
+    <h1>Update your details</h1>
+    <p class="sub">Let us know if anything's changed — we'll confirm before anything is updated on our side.</p>
+    <div id="banner"></div>
+    <div class="acc open"><div class="acc-body" style="padding:18px 20px">
+      <label>Coordinator's first name (if it's changed)</label>
+      <input type="text" id="detFirst" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
+      <label>Coordinator's surname</label>
+      <input type="text" id="detSurname" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
+      <label>Coordinator's email</label>
+      <input type="text" id="detEmail" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
+      <label>Coordinator's mobile number</label>
+      <input type="text" id="detPhone" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
+      <label>Congregation image/streaming email (if it's changed)</label>
+      <input type="text" id="detImageEmail" placeholder="Leave blank if unchanged">
+      <div class="row" style="margin-top:14px"><button id="detSubmitBtn">Send update</button><button class="secondary" id="detBackBtn">Never mind</button></div>
+    </div></div>`;
+  document.getElementById('backLink').addEventListener('click', backToHub);
+  document.getElementById('detBackBtn').addEventListener('click', backToHub);
+  document.getElementById('detSubmitBtn').addEventListener('click', async ()=>{
+    const firstname=document.getElementById('detFirst').value.trim(), surname=document.getElementById('detSurname').value.trim();
+    const email=document.getElementById('detEmail').value.trim(), phone=document.getElementById('detPhone').value.trim();
+    const image_email=document.getElementById('detImageEmail').value.trim();
+    if(!firstname&&!surname&&!email&&!phone&&!image_email){ banner(false,"Let us know what's changed first."); return; }
+    const btn=document.getElementById('detSubmitBtn'); btn.disabled=true;
+    try{
+      const res=await fetch(`${API}/booking-cong-details`,{method:'POST',body:new URLSearchParams({t:TOKEN,firstname,surname,email,phone,image_email})});
+      const j=await res.json(); banner(j.ok,j.message); if(j.ok) setTimeout(backToHub,1400); else btn.disabled=false;
+    }catch(e){ banner(false,'Could not reach the server.'); btn.disabled=false; }
+  });
+}
+function backToHub(){ view='hub'; render(); scrollToTop(); }
+
+function banner(ok,msg){ const el=document.getElementById('banner'); if(!el||!msg) return; el.innerHTML=`<div class="banner ${ok?'ok':'err'}">${esc(msg)}</div>`; }
+function scrollToTop(){ window.scrollTo({top:0,behavior:'smooth'}); }
+
+load();
+</script>
+</body>
+</html>
