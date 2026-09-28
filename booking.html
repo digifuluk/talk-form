@@ -66,7 +66,15 @@
   .cal-month.taken{background:var(--taken-bg);color:var(--taken);cursor:default}
   .cal-month.cooldown{background:var(--cooldown-bg);color:var(--cooldown);cursor:default}
   .cal-month.past{background:var(--past-bg);color:var(--past-ink);cursor:default}
+  .cal-month.too_far{background:var(--past-bg);color:var(--past-ink);cursor:default}
   .cal-month.selected{outline:2px solid var(--accent);outline-offset:1px}
+  .pref-note{background:var(--accent-bg);border:1px solid #c9dae3;border-radius:6px;padding:9px 14px;font-size:13px;color:var(--accent);margin-bottom:16px}
+  .pref-badge{display:inline-block;background:var(--accent-bg);color:var(--accent);font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:10px;margin-bottom:8px}
+  .dws-row{display:grid;grid-template-columns:130px 1fr;gap:4px 14px;padding:9px 0;border-top:1px solid var(--rule);font-size:14px}
+  .dws-row:first-child{border-top:none}
+  .dws-name{font-weight:600}
+  .dws-talks{color:var(--ink-soft);font-variant-numeric:tabular-nums;line-height:1.6}
+  @media (max-width:480px){ .dws-row{grid-template-columns:1fr} }
   .cal-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink-soft);margin-top:12px}
   .cal-legend span{display:inline-flex;align-items:center;gap:5px}
   .cal-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
@@ -102,7 +110,7 @@
 <script>
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get('t') || '';
-const URL_MODE = params.get('mode');   // speakers | cancel | details
+const URL_MODE = params.get('mode');   // speakers | cancel | details | ourspeakers
 const URL_MX = params.get('mx');
 const URL_CLAIM = params.get('claim'); // round-robin freed month YYYY-MM-01
 const API = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
@@ -161,6 +169,7 @@ function initialOpenSet(){
   const s = new Set();
   if(URL_MODE === 'speakers' || (URL_MODE === null && URL_CLAIM === null && data.current_exchanges.length)) s.add('bookings');
   if(URL_MODE === 'cancel') s.add('cancel');
+  if(URL_MODE === 'ourspeakers') s.add('ourspeakers');
   if(URL_CLAIM || (URL_MODE === null && !data.current_exchanges.length)) s.add('new');
   if(s.size === 0) s.add('bookings');
   return s;
@@ -170,6 +179,12 @@ function render(){
   if(view === 'details'){ renderDetails(); return; }
   if(openSet.size === 0) openSet = initialOpenSet();
   renderHub();
+}
+
+function renderOurSpeakers(){
+  const list = data.dw_speakers || [];
+  if(!list.length) return '<p class="muted">No speaker details are available yet.</p>';
+  return list.map(s=>`<div class="dws-row"><div class="dws-name">${esc(s.name)}</div><div class="dws-talks">${s.talks.join(', ')}</div></div>`).join('');
 }
 
 function accHead(key, label){
@@ -185,6 +200,7 @@ function renderHub(){
   app.innerHTML = `
     <h1>Exchanges with ${esc(data.cong_name)}</h1>
     <p class="sub">Manage your public talk exchanges with Darlington West. Link valid until ${esc(data.valid_until)}.</p>
+    ${data.preferred_month_label ? `<div class="pref-note">📅 Preferred month on record: <strong>${esc(data.preferred_month_label)}</strong></div>` : ''}
     <div id="banner"></div>
 
     <!-- Container 1 -->
@@ -244,6 +260,7 @@ function renderHub(){
           <span><i style="background:var(--taken-bg)"></i>Already exchanging</span>
           <span><i style="background:var(--cooldown-bg)"></i>Too close to another exchange</span>
           <span><i style="background:var(--past-bg)"></i>Past</span>
+          <span><i style="background:var(--past-bg)"></i>Too far ahead to book yet</span>
         </div>
         <div id="previewArea"></div>
       </div>
@@ -262,6 +279,15 @@ function renderHub(){
           </select>
           <div id="cancelDetail"></div>
         ` : `<p class="muted">You have no bookings to cancel.</p>`}
+      </div>
+    </div>
+
+    <!-- Container 4 (view-only) -->
+    <div class="acc ${openSet.has('ourspeakers')?'open':''}" id="acc-ourspeakers">
+      ${accHead('ourspeakers','👥 Our speakers and their talks')}
+      <div class="acc-body">
+        <p class="muted sub-first">Darlington West's speakers who are available for exchanges, and the talk outlines each has on record. This list is kept up to date automatically.</p>
+        ${renderOurSpeakers()}
       </div>
     </div>
 
@@ -300,7 +326,7 @@ function renderHub(){
 
   if(!didInitScroll){
     didInitScroll = true;
-    const target = URL_MODE==='speakers' ? 'speakerArea' : URL_MODE==='cancel' ? 'acc-cancel' : URL_CLAIM ? 'acc-new' : null;
+    const target = URL_MODE==='speakers' ? 'speakerArea' : URL_MODE==='cancel' ? 'acc-cancel' : URL_MODE==='ourspeakers' ? 'acc-ourspeakers' : URL_CLAIM ? 'acc-new' : null;
     if(target) setTimeout(()=>{ const el=document.getElementById(target); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60);
   }
 }
@@ -320,8 +346,11 @@ function renderPreview(){
   const area = document.getElementById('previewArea'); if(!area) return;
   const mp = data.month_preview;
   if(!mp){ area.innerHTML=''; return; }
+  const previewMonthNum = Number(mp.value.split('-')[1]);
+  const isPreferredMonth = !!data.preferred_month && previewMonthNum === data.preferred_month;
   area.innerHTML = `
     <div class="preview">
+      ${isPreferredMonth ? `<div class="pref-badge">⭐ Preferred Month</div>` : ''}
       <h3>${esc(mp.label)}</h3>
       ${mp.sundays.map(s=>`<div class="sun-row"><span>${esc(s.label)}</span>${s.blocked?`<span class="blocked">blocked — ${esc(s.reason)}${s.source==='own'?' (already on file for you)':''}</span>`:'<span style="color:var(--ok)">open</span>'}</div>`).join('')}
       <div class="row" style="margin-top:12px">
