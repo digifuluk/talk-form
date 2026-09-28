@@ -228,6 +228,15 @@ function renderHub(){
       </div>
     </div>
 
+    <!-- Our speakers (view-only) -->
+    <div class="acc ${openSet.has('ourspeakers')?'open':''}" id="acc-ourspeakers">
+      ${accHead('ourspeakers','👥 Our speakers and their talks')}
+      <div class="acc-body">
+        <p class="muted sub-first">Darlington West's speakers who are available for exchanges, and the talk outlines each has on record. This list is kept up to date automatically.</p>
+        ${renderOurSpeakers()}
+      </div>
+    </div>
+
     <!-- Container 2 -->
     <div class="acc ${openSet.has('new')?'open':''}" id="acc-new">
       ${accHead('new','⊕ New booking')}
@@ -282,16 +291,7 @@ function renderHub(){
       </div>
     </div>
 
-    <!-- Container 4 (view-only) -->
-    <div class="acc ${openSet.has('ourspeakers')?'open':''}" id="acc-ourspeakers">
-      ${accHead('ourspeakers','👥 Our speakers and their talks')}
-      <div class="acc-body">
-        <p class="muted sub-first">Darlington West's speakers who are available for exchanges, and the talk outlines each has on record. This list is kept up to date automatically.</p>
-        ${renderOurSpeakers()}
-      </div>
-    </div>
-
-    <p class="sub" style="text-align:center"><a class="link-btn" id="detailsLink">Update your congregation's coordinator, email or phone details</a></p>
+    <p class="sub" style="text-align:center"><a class="link-btn" id="detailsLink">Update your congregation's Public Talk Coordinator, email or phone details</a></p>
   `;
 
   // Accordion toggles (independent — opening one never closes others).
@@ -540,13 +540,13 @@ function renderDetails(){
     <p class="sub">Let us know if anything's changed — we'll confirm before anything is updated on our side.</p>
     <div id="banner"></div>
     <div class="acc open"><div class="acc-body" style="padding:18px 20px">
-      <label>Coordinator's first name (if it's changed)</label>
+      <label>Public Talk Coordinator's first name (if it's changed)</label>
       <input type="text" id="detFirst" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
-      <label>Coordinator's surname</label>
+      <label>Public Talk Coordinator's surname</label>
       <input type="text" id="detSurname" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
-      <label>Coordinator's email</label>
+      <label>Public Talk Coordinator's email</label>
       <input type="text" id="detEmail" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
-      <label>Coordinator's mobile number</label>
+      <label>Public Talk Coordinator's mobile number</label>
       <input type="text" id="detPhone" placeholder="Leave blank if unchanged"><div style="height:10px"></div>
       <label>Congregation image/streaming email (if it's changed)</label>
       <input type="text" id="detImageEmail" placeholder="Leave blank if unchanged">
