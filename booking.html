@@ -86,6 +86,7 @@
   .dw-state.bad{color:var(--bad)}
   .dw-spk{margin-top:6px;padding:9px 11px;background:#f7f9fa;border:1px solid #eef0f2;border-radius:6px}
   .dw-line{font-size:14px;line-height:1.5}
+  .dw-legend{color:var(--ink-soft);font-size:13px}
   .dw-pick{margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .dw-pick select{flex:1;min-width:170px;padding:7px 9px;font-size:14px}
   .dw-saved{font-size:12.5px;color:var(--ok)}
@@ -155,7 +156,8 @@ let calYear = null;
 let selectedPreviewMonth = null;
 let expandedBooking = null;   // mx_id selected in container 1
 let cancelBooking = null;     // mx_id selected in container 3
-let openSet = new Set();      // which accordion containers are open: 'bookings'|'new'|'cancel'
+let openSet = new Set();      // which accordion containers are open: 'bookings'|'ourspeakers'|'yourspeakers'|'new'|'cancel'
+let openInit = false;         // openSet is seeded from the URL once, then owned by the visitor
 let didInitScroll = false;
 let view = 'hub';             // 'hub' | 'details'
 if (URL_MODE === 'details') view = 'details';
@@ -199,20 +201,19 @@ async function load(year, previewMonth){
   }
 }
 
+// Which containers start open. A plain link (no mode / claim parameter) opens NONE of them.
 function initialOpenSet(){
   const s = new Set();
   if(URL_MODE === 'speakers'){ s.add('ourspeakers'); s.add('yourspeakers'); }
-  if(URL_MODE === null && URL_CLAIM === null && data.current_exchanges.length) s.add('bookings');
-  if(URL_MODE === 'cancel') s.add('cancel');
   if(URL_MODE === 'ourspeakers') s.add('ourspeakers');
-  if(URL_CLAIM || (URL_MODE === null && !data.current_exchanges.length)) s.add('new');
-  if(s.size === 0) s.add('bookings');
+  if(URL_MODE === 'cancel') s.add('cancel');
+  if(URL_CLAIM) s.add('new');
   return s;
 }
 
 function render(){
   if(view === 'details'){ renderDetails(); return; }
-  if(openSet.size === 0) openSet = initialOpenSet();
+  if(!openInit){ openSet = initialOpenSet(); openInit = true; }
   renderHub();
 }
 
@@ -234,6 +235,8 @@ function renderHub(){
   const na = data.next_available;
   const claimMonth = URL_CLAIM || null;
   const claimLabel = claimMonth ? monthLabelFromValue(claimMonth) : null;
+  // booking-options sends new_booking_allowed=false for a congregation with cooperation_score 0. Missing field = allowed.
+  const newAllowed = data.new_booking_allowed !== false;
 
   app.innerHTML = `
     <h1>Exchanges with ${esc(data.cong_name)}</h1>
@@ -251,7 +254,7 @@ function renderHub(){
           ${data.current_exchanges.map(b=>`<option value="${b.mx_id}" ${expandedBooking===b.mx_id?'selected':''}>${esc(b.month_label)} — ${b.status==='pencilled'?'Pencilled, awaiting confirmation':'Confirmed'}</option>`).join('')}
         </select>` : `
         <h2 class="pick-title">Your bookings</h2>
-        <p class="pick-help" style="margin:0">Nothing is currently booked with us — you can request a month in “New booking” below.</p>`}
+        <p class="pick-help" style="margin:0">${newAllowed ? 'Nothing is currently booked with us — you can request a month in “New booking” below.' : 'Nothing is currently booked with us.'}</p>`}
     </div>
 
     <div id="monthGated" style="display:${expandedBooking ? 'block' : 'none'}">
@@ -297,7 +300,8 @@ function renderHub(){
 
     <!-- 👥 Manage your Speakers & Talks (light blue) goes HERE - not built yet, see handoff v7 Section J -->
 
-    <!-- Container 2 -->
+    <!-- Container 2 (not rendered at all when the congregation's cooperation_score is 0) -->
+    ${newAllowed ? `
     <div class="acc ${openSet.has('new')?'open':''}" id="acc-new">
       ${accHead('new','⊕ New booking')}
       <div class="acc-body">
@@ -333,7 +337,7 @@ function renderHub(){
         </div>
         <div id="previewArea"></div>
       </div>
-    </div>
+    </div>` : ''}
 
     <!-- Container 3 (hidden when every exchange is inside the cancellation cut-off) -->
     ${cancellable.length ? `
@@ -367,10 +371,12 @@ function renderHub(){
   const claimBtn = document.getElementById('claimBook');
   if(claimBtn) claimBtn.addEventListener('click', (e)=>submitBooking(URL_CLAIM, e));
   if(na){ const hb=document.getElementById('heroBook'); if(hb) hb.addEventListener('click',(e)=>submitBooking(na.value,e)); }
-  document.getElementById('calPrev').addEventListener('click', ()=>{ calYear--; load(calYear); });
-  document.getElementById('calNext').addEventListener('click', ()=>{ calYear++; load(calYear); });
-  renderCalGrid();
-  if(selectedPreviewMonth) renderPreview();
+  if(newAllowed){
+    document.getElementById('calPrev').addEventListener('click', ()=>{ calYear--; load(calYear); });
+    document.getElementById('calNext').addEventListener('click', ()=>{ calYear++; load(calYear); });
+    renderCalGrid();
+    if(selectedPreviewMonth) renderPreview();
+  }
 
   wireExchangeAreas();
   renderYourRoster();
@@ -517,15 +523,27 @@ function wireExchangeAreas(){
 }
 
 // ── 👥 Our Speakers: DW speaker(s) per date + the partner's preferred talk ──
+// A speaker's talk numbers, ascending, always including the preferred talk (display only).
+function talksWithPref(sl){
+  const t = (sl.talks || []).slice();
+  if(sl.preferred_talk != null && !t.includes(sl.preferred_talk)) t.push(sl.preferred_talk);
+  return t.sort((a,b)=>a-b);
+}
+// Row text: "Name (22, 36, ★ 69, 93)" + "| ★ = Preferred talk" only when a preferred talk exists on this row.
 function dwLine(sl){
   const name = `<b>${esc(sl.name)}</b>`;
-  const talks = sl.talks || [];
   if(sl.talk_number != null) return `${name} | Talk: ${sl.talk_number}`;
-  if(sl.preferred_talk != null){
-    const others = talks.filter(n=>n!==sl.preferred_talk);
-    return `${name} | Preferred talk: ${sl.preferred_talk}${others.length ? ` (Other talks: ${others.join(', ')})` : ''}`;
-  }
-  return `${name} (${talks.length ? talks.join(', ') : 'no talks on file'})`;
+  const talks = talksWithPref(sl);
+  const list = talks.length ? talks.map(n=> n === sl.preferred_talk ? `★ ${n}` : String(n)).join(', ') : 'no talks on file';
+  const legend = sl.preferred_talk != null ? ` <span class="dw-legend">| ★ = Preferred talk</span>` : '';
+  return `${name} (${list})${legend}`;
+}
+// Dropdown options: preferred talk first (shown "★ 69", value stays "69"), then the rest ascending.
+function dwPrefOptions(sl){
+  const pref = sl.preferred_talk;
+  const rest = talksWithPref(sl).filter(n=>n !== pref);
+  const top = pref != null ? `<option value="${pref}" selected>★ ${pref}</option>` : '';
+  return top + rest.map(n=>`<option value="${n}">${n}</option>`).join('');
 }
 function canChoosePref(sl){ return sl.talk_number == null && sl.status !== 'entered_nws' && (sl.talks||[]).length > 0; }
 function dwRow(s){
@@ -550,7 +568,7 @@ function dwRow(s){
         <select class="dw-pref" data-slot="${sl.slot_id}" data-prev="${sl.preferred_talk ?? ''}">
           ${multi ? (sl.preferred_talk == null ? '<option value="">Choose a preferred talk…</option>' : '')
                   : `<option value="">${sl.preferred_talk != null ? 'No preference' : 'Choose a preferred talk…'}</option>`}
-          ${sl.talks.map(n=>`<option value="${n}" ${n===sl.preferred_talk?'selected':''}>${n}</option>`).join('')}
+          ${dwPrefOptions(sl)}
         </select>
         <span class="dw-msg" data-slot="${sl.slot_id}"></span>
       </div>` : ''}
@@ -571,7 +589,7 @@ function renderDwDates(savedSlot){
     ${b.sundays.map(dwRow).join('')}`;
   area.querySelectorAll('.dw-pref').forEach(sel=>sel.addEventListener('change', ()=>saveDwPref(sel)));
   area.querySelectorAll('.dw-reselect').forEach(a=>a.addEventListener('click', ()=>reselectDate(a.dataset.date)));
-  if(savedSlot){ const m = area.querySelector(`.dw-msg[data-slot="${savedSlot}"]`); if(m){ m.className = 'dw-saved'; m.textContent = '✓ Saved'; } }
+  if(savedSlot){ const m = area.querySelector(`.dw-msg[data-slot="${savedSlot}"]`); if(m){ m.className = 'dw-msg dw-saved'; m.textContent = '✓ Saved'; } }
 }
 async function postDwPref(slotId, talk){
   const res = await fetch(`${API}/booking-dw-talk-pref`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:TOKEN,mx:expandedBooking,slot_id:slotId,talk_number:talk})});
@@ -594,8 +612,8 @@ async function saveDwPref(sel){
   try{
     const j = await postDwPref(slotId, val===''?null:Number(val));
     if(j.ok){ applyPrefLocally(slotId, val===''?null:Number(val)); renderDwDates(slotId); }
-    else { sel.value = prev; sel.disabled = false; msg.className = 'dw-err'; msg.textContent = j.message || 'Could not save.'; }
-  }catch(e){ sel.value = prev; sel.disabled = false; msg.className = 'dw-err'; msg.textContent = 'Could not reach the server.'; }
+    else { sel.value = prev; sel.disabled = false; msg.className = 'dw-msg dw-err'; msg.textContent = j.message || 'Could not save.'; }
+  }catch(e){ sel.value = prev; sel.disabled = false; msg.className = 'dw-msg dw-err'; msg.textContent = 'Could not reach the server.'; }
 }
 async function reselectDate(date){
   const b = selectedBooking(); if(!b) return;
