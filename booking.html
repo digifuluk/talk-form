@@ -75,6 +75,24 @@
   .dws-name{font-weight:600}
   .dws-talks{color:var(--ink-soft);font-variant-numeric:tabular-nums;line-height:1.6}
   @media (max-width:480px){ .dws-row{grid-template-columns:1fr} }
+  /* Our Speakers / Your Speakers */
+  .exch-label{font-size:13px;color:var(--ink-soft);margin-bottom:12px}
+  .dw-row{padding:11px 0;border-top:1px solid #eef0f2}
+  .dw-row:first-of-type{border-top:none}
+  .dw-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .dw-date{font-weight:600;font-size:14px}
+  .dw-state{font-size:12.5px;color:var(--ink-soft)}
+  .dw-state.bad{color:var(--bad)}
+  .dw-spk{margin-top:6px;padding:9px 11px;background:#f7f9fa;border:1px solid #eef0f2;border-radius:6px}
+  .dw-line{font-size:14px;line-height:1.5}
+  .dw-pick{margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .dw-pick select{flex:1;min-width:170px;padding:7px 9px;font-size:14px}
+  .dw-saved{font-size:12.5px;color:var(--ok)}
+  .dw-err{font-size:12.5px;color:var(--bad)}
+  .roster-line{padding:6px 0;border-top:1px solid #eef0f2;font-size:14px}
+  .roster-line:first-of-type{border-top:none}
+  .na-note{font-size:12.5px;color:var(--cooldown);margin-bottom:6px}
+  .filled-line{font-size:13.5px;color:var(--ink-soft);padding:6px 0;border-top:1px solid #eef0f2}
   .cal-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink-soft);margin-top:12px}
   .cal-legend span{display:inline-flex;align-items:center;gap:5px}
   .cal-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
@@ -110,7 +128,7 @@
 <script>
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get('t') || '';
-const URL_MODE = params.get('mode');   // speakers | cancel | details | ourspeakers
+const URL_MODE = params.get('mode');   // speakers (opens Our + Your Speakers) | cancel | details | ourspeakers
 const URL_MX = params.get('mx');
 const URL_CLAIM = params.get('claim'); // round-robin freed month YYYY-MM-01
 const API = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
@@ -167,7 +185,8 @@ async function load(year, previewMonth){
 
 function initialOpenSet(){
   const s = new Set();
-  if(URL_MODE === 'speakers' || (URL_MODE === null && URL_CLAIM === null && data.current_exchanges.length)) s.add('bookings');
+  if(URL_MODE === 'speakers'){ s.add('ourspeakers'); s.add('yourspeakers'); }
+  if(URL_MODE === null && URL_CLAIM === null && data.current_exchanges.length) s.add('bookings');
   if(URL_MODE === 'cancel') s.add('cancel');
   if(URL_MODE === 'ourspeakers') s.add('ourspeakers');
   if(URL_CLAIM || (URL_MODE === null && !data.current_exchanges.length)) s.add('new');
@@ -193,6 +212,8 @@ function accHead(key, label){
 }
 
 function renderHub(){
+  if(data.current_exchanges.length && !data.current_exchanges.some(x=>x.mx_id===expandedBooking)) expandedBooking = data.current_exchanges[0].mx_id;
+  const cancellable = data.current_exchanges.filter(b=>b.cancellable);
   const na = data.next_available;
   const claimMonth = URL_CLAIM || null;
   const claimLabel = claimMonth ? monthLabelFromValue(claimMonth) : null;
@@ -210,7 +231,6 @@ function renderHub(){
         <label class="sub-first">Your current bookings with us</label>
         ${data.current_exchanges.length ? `
           <select class="booking-select" id="bookingSelect">
-            <option value="">Select a month…</option>
             ${data.current_exchanges.map(b=>`<option value="${b.mx_id}" ${expandedBooking===b.mx_id?'selected':''}>${esc(b.month_label)} — ${b.status==='pencilled'?'Pencilled, awaiting confirmation':'Confirmed'}</option>`).join('')}
           </select>
           <div id="bookingDetail"></div>
@@ -220,20 +240,34 @@ function renderHub(){
             <div id="blockedArea"></div>
           </div>
 
-          <div class="subsection">
-            <h3>👤 Add speakers and talks</h3>
-            <div id="speakerArea"></div>
-          </div>
         ` : `<p class="muted">Nothing currently booked with us.</p>`}
       </div>
     </div>
 
-    <!-- Our speakers (view-only) -->
+    <!-- Our Speakers -->
     <div class="acc ${openSet.has('ourspeakers')?'open':''}" id="acc-ourspeakers">
-      ${accHead('ourspeakers','👥 Our speakers and their talks')}
+      ${accHead('ourspeakers','👥 Our Speakers')}
       <div class="acc-body">
-        <p class="muted sub-first">Darlington West's speakers who are available for exchanges, and the talk outlines each has on record. This list is kept up to date automatically.</p>
-        ${renderOurSpeakers()}
+        ${data.current_exchanges.length ? `<div id="dwPick"></div><div id="dwDatesArea"></div>` : ''}
+        <div class="${data.current_exchanges.length ? 'subsection' : ''}">
+          <h3>All our speakers and their talks</h3>
+          <p class="muted sub-first">Darlington West's speakers who are available for exchanges, and the talk outlines each has on record. This list is kept up to date automatically.</p>
+          ${renderOurSpeakers()}
+        </div>
+      </div>
+    </div>
+
+    <!-- Your Speakers -->
+    <div class="acc ${openSet.has('yourspeakers')?'open':''}" id="acc-yourspeakers">
+      ${accHead('yourspeakers','👥 Your Speakers')}
+      <div class="acc-body">
+        ${data.current_exchanges.length ? `<div id="yoPick"></div>` : ''}
+        <div id="yourRosterArea"></div>
+        ${data.current_exchanges.length ? `
+        <div class="subsection">
+          <h3>Assign your speakers to dates</h3>
+          <div id="speakerArea"></div>
+        </div>` : `<p class="muted" style="margin-top:12px">Nothing currently booked with us.</p>`}
       </div>
     </div>
 
@@ -275,21 +309,20 @@ function renderHub(){
       </div>
     </div>
 
-    <!-- Container 3 -->
+    <!-- Container 3 (hidden when every exchange is inside the cancellation cut-off) -->
+    ${cancellable.length ? `
     <div class="acc ${openSet.has('cancel')?'open':''}" id="acc-cancel">
       ${accHead('cancel','❌ Request cancellation')}
       <div class="acc-body">
         <p class="muted sub-first">Please note cancellations cause logistical challenges and should only be requested for exceptional reasons. Once a cancellation is approved, the relevant month is immediately offered to other congregations to book.</p>
-        ${data.current_exchanges.length ? `
-          <label>Which booking do you need to cancel?</label>
-          <select class="booking-select" id="cancelSelect">
-            <option value="">Select a month…</option>
-            ${data.current_exchanges.map(b=>`<option value="${b.mx_id}" ${cancelBooking===b.mx_id?'selected':''}>${esc(b.month_label)}</option>`).join('')}
-          </select>
-          <div id="cancelDetail"></div>
-        ` : `<p class="muted">You have no bookings to cancel.</p>`}
+        <label>Which booking do you need to cancel?</label>
+        <select class="booking-select" id="cancelSelect">
+          <option value="">Select a month…</option>
+          ${cancellable.map(b=>`<option value="${b.mx_id}" ${cancelBooking===b.mx_id?'selected':''}>${esc(b.month_label)}</option>`).join('')}
+        </select>
+        <div id="cancelDetail"></div>
       </div>
-    </div>
+    </div>` : ''}
 
     <p class="sub" style="text-align:center"><a class="link-btn" id="detailsLink">Update your congregation's Public Talk Coordinator, email or phone details</a></p>
   `;
@@ -313,11 +346,8 @@ function renderHub(){
   renderCalGrid();
   if(selectedPreviewMonth) renderPreview();
 
-  const sel = document.getElementById('bookingSelect');
-  if(sel){
-    sel.addEventListener('change', e=>{ expandedBooking = e.target.value || null; renderBookingDetail(); renderBlockedArea(); renderSpeakerArea(); });
-    renderBookingDetail(); renderBlockedArea(); renderSpeakerArea();
-  }
+  wireExchangeAreas();
+  renderYourRoster();
   const csel = document.getElementById('cancelSelect');
   if(csel){
     csel.addEventListener('change', e=>{ cancelBooking = e.target.value || null; renderCancelDetail(); });
@@ -326,7 +356,7 @@ function renderHub(){
 
   if(!didInitScroll){
     didInitScroll = true;
-    const target = URL_MODE==='speakers' ? 'speakerArea' : URL_MODE==='cancel' ? 'acc-cancel' : URL_MODE==='ourspeakers' ? 'acc-ourspeakers' : URL_CLAIM ? 'acc-new' : null;
+    const target = URL_MODE==='speakers' ? 'acc-ourspeakers' : URL_MODE==='cancel' ? 'acc-cancel' : URL_MODE==='ourspeakers' ? 'acc-ourspeakers' : URL_CLAIM ? 'acc-new' : null;
     if(target) setTimeout(()=>{ const el=document.getElementById(target); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60);
   }
 }
@@ -391,15 +421,13 @@ function renderBookingDetail(){
   const b = selectedBooking();
   if(!b){ area.innerHTML=''; return; }
   const checkDone = b.blocked_dates_partner_check;
+  const blocked = b.sundays.filter(s=>s.blocked_reason);
   area.innerHTML = `
     <span class="detail-status ${b.status}">${b.status==='pencilled'?'Pencilled':'Confirmed'}</span>
     <div class="check-row ${checkDone?'done':'pending'}">
       ${checkDone ? '✓ Your blocked dates are confirmed for this month' : '⚠ Blocked dates not yet confirmed for this month'}
     </div>
-    ${b.sundays.map(s=>`
-      <div class="slot-row"><span>${esc(s.label)}</span>
-        <span class="slot-tag ${s.kind}">${s.blocked_reason ? esc(s.blocked_reason)+' — ' : ''}${esc(describeSlot(s))}</span>
-      </div>`).join('')}`;
+    <div class="muted"><strong>Unavailable dates:</strong> ${blocked.length ? blocked.map(s=>`${esc(s.label)} — ${esc(s.blocked_reason)}`).join(' · ') : 'none recorded'}</div>`;
 }
 
 function renderBlockedArea(){
@@ -436,55 +464,177 @@ function renderBlockedArea(){
   });
 }
 
+// ── Exchange selection shared by Current bookings / Our Speakers / Your Speakers ──
+function exchangeOptions(){
+  return data.current_exchanges.map(b=>`<option value="${b.mx_id}" ${expandedBooking===b.mx_id?'selected':''}>${esc(b.month_label)} — ${b.status==='pencilled'?'Pencilled, awaiting confirmation':'Confirmed'}</option>`).join('');
+}
+function renderPickers(){
+  const many = data.current_exchanges.length > 1;
+  const b = selectedBooking();
+  ['dwPick','yoPick'].forEach(id=>{
+    const el = document.getElementById(id); if(!el) return;
+    el.innerHTML = many
+      ? `<label class="sub-first">Which exchange?</label><select class="booking-select exch-pick">${exchangeOptions()}</select>`
+      : (b ? `<div class="exch-label">For your <strong>${esc(b.month_label)}</strong> exchange with us</div>` : '');
+    const sel = el.querySelector('.exch-pick'); if(sel) sel.addEventListener('change', e=>selectExchange(e.target.value));
+  });
+}
+function renderExchangeAreas(){ renderPickers(); renderBookingDetail(); renderBlockedArea(); renderDwDates(); renderSpeakerArea(); }
+function selectExchange(id){
+  expandedBooking = id || null;
+  const bs = document.getElementById('bookingSelect'); if(bs) bs.value = expandedBooking || '';
+  renderExchangeAreas();
+}
+function wireExchangeAreas(){
+  const sel = document.getElementById('bookingSelect');
+  if(sel) sel.addEventListener('change', e=>selectExchange(e.target.value));
+  if(data.current_exchanges.length) renderExchangeAreas();
+}
+
+// ── 👥 Our Speakers: DW speaker(s) per date + the partner's preferred talk ──
+function dwLine(sl){
+  const name = `<b>${esc(sl.name)}</b>`;
+  const talks = sl.talks || [];
+  if(sl.talk_number != null) return `${name} | Talk: ${sl.talk_number}`;
+  if(sl.preferred_talk != null){
+    const others = talks.filter(n=>n!==sl.preferred_talk);
+    return `${name} | Preferred talk: ${sl.preferred_talk}${others.length ? ` (Other talks: ${others.join(', ')})` : ''}`;
+  }
+  return `${name} (${talks.length ? talks.join(', ') : 'no talks on file'})`;
+}
+function canChoosePref(sl){ return sl.talk_number == null && sl.status !== 'entered_nws' && (sl.talks||[]).length > 0; }
+function dwRow(s){
+  const head = (state, cls) => `<div class="dw-head"><span class="dw-date">${esc(s.label)}</span>${state ? `<span class="dw-state ${cls||''}">${state}</span>` : ''}</div>`;
+  if(s.blocked_reason) return `<div class="dw-row">${head(`${esc(s.blocked_reason)} — ${esc(SLOT_LABEL[s.kind]||'')}`,'bad')}</div>`;
+  if(s.kind === 'sending_only') return `<div class="dw-row">${head('Only your speaker visits Darlington West this date — no speaker needed from us')}</div>`;
+  const slots = s.dw.slots || [];
+  if(!slots.length){
+    const na = s.dw.state === 'not_available';
+    return `<div class="dw-row">${head(na ? 'No Darlington West speaker available this date' : 'Darlington West speaker to be confirmed', na ? 'bad' : '')}</div>`;
+  }
+  const spk = slots.map(sl=>`
+    <div class="dw-spk">
+      <div class="dw-line">${dwLine(sl)}</div>
+      ${canChoosePref(sl) ? `
+      <div class="dw-pick">
+        <select class="dw-pref" data-slot="${sl.slot_id}" data-prev="${sl.preferred_talk ?? ''}">
+          <option value="">${sl.preferred_talk != null ? 'No preference' : 'Choose a preferred talk…'}</option>
+          ${sl.talks.map(n=>`<option value="${n}" ${n===sl.preferred_talk?'selected':''}>${n}</option>`).join('')}
+        </select>
+        <span class="dw-msg" data-slot="${sl.slot_id}"></span>
+      </div>` : ''}
+    </div>`).join('');
+  return `<div class="dw-row">${head('')}${spk}</div>`;
+}
+function renderDwDates(savedSlot){
+  const area = document.getElementById('dwDatesArea'); if(!area) return;
+  const b = selectedBooking(); if(!b){ area.innerHTML=''; return; }
+  area.innerHTML = `
+    <h3>Our speakers visiting you — ${esc(b.month_label)}</h3>
+    <p class="muted sub-first">Each date shows the Darlington West speaker and the talks they can give. You can choose the talk you'd prefer and we'll do our best to arrange it.</p>
+    ${b.sundays.map(dwRow).join('')}`;
+  area.querySelectorAll('.dw-pref').forEach(sel=>sel.addEventListener('change', ()=>saveDwPref(sel)));
+  if(savedSlot){ const m = area.querySelector(`.dw-msg[data-slot="${savedSlot}"]`); if(m){ m.className = 'dw-saved'; m.textContent = '✓ Saved'; } }
+}
+async function saveDwPref(sel){
+  const slotId = sel.dataset.slot, val = sel.value, prev = sel.dataset.prev;
+  const area = document.getElementById('dwDatesArea');
+  const msg = area.querySelector(`.dw-msg[data-slot="${slotId}"]`);
+  sel.disabled = true; msg.className = 'dw-msg muted'; msg.textContent = 'Saving…';
+  try{
+    const res = await fetch(`${API}/booking-dw-talk-pref`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:TOKEN,mx:expandedBooking,slot_id:slotId,talk_number: val===''?null:Number(val)})});
+    const j = await res.json();
+    if(j.ok){
+      const b = selectedBooking();
+      b.sundays.forEach(s=>(s.dw.slots||[]).forEach(sl=>{ if(sl.slot_id===slotId) sl.preferred_talk = val===''?null:Number(val); }));
+      renderDwDates(slotId);
+    } else { sel.value = prev; sel.disabled = false; msg.className = 'dw-err'; msg.textContent = j.message || 'Could not save.'; }
+  }catch(e){ sel.value = prev; sel.disabled = false; msg.className = 'dw-err'; msg.textContent = 'Could not reach the server.'; }
+}
+
+// ── 👥 Your Speakers: roster (same logic as the E3 email) + assignment ──
+function renderYourRoster(){
+  const area = document.getElementById('yourRosterArea'); if(!area) return;
+  const r = data.your_roster || { state:'no_record', rows:[] };
+  let body;
+  if(r.state === 'normal'){
+    body = `<p class="muted sub-first">Listed in preference order — first means longest since we last heard it at Darlington West. Outlines given here in the last 6 months are left out.</p>`
+         + r.rows.map(x=>`<div class="roster-line"><b>${esc(x.name)}</b> (${x.talks.join(', ')})</div>`).join('');
+  } else if(r.state === 'all_filtered'){
+    body = `<p class="muted sub-first">All of your speakers' outlines (${esc(r.excluded_list)}) have been given at Darlington West in the last 6 months. Please check your speakers' talk lists are up to date.</p>`;
+  } else {
+    body = `<p class="muted sub-first">We don't have any outlines on record for your speakers yet — choose “Speaker not listed” below to add a speaker and their talk.</p>`;
+  }
+  area.innerHTML = `<h3>Your speakers and their talks</h3>${body}`;
+}
+
 function renderSpeakerArea(){
   const area = document.getElementById('speakerArea'); if(!area) return;
   const b = selectedBooking();
-  if(!b){ area.innerHTML='<p class="muted">Select one of your bookings above first.</p>'; return; }
-  const openF3 = b.sundays.filter(s => !s.blocked_reason && (s.kind==='two_way'||s.kind==='sending_only') && !s.sending_speaker);
-  if(!openF3.length){ area.innerHTML='<p class="muted">No dates currently need a speaker from your side for this month.</p>'; return; }
+  if(!b){ area.innerHTML='<p class="muted">Select one of your bookings first.</p>'; return; }
+  const dates = b.sundays.filter(s => !s.blocked_reason && (s.kind==='two_way' || s.kind==='sending_only'));
+  if(!dates.length){ area.innerHTML='<p class="muted">No dates this month need a speaker from your side.</p>'; return; }
+  const filled = dates.filter(s=>s.partner.state==='filled');
+  const open = dates.filter(s=>s.partner.state!=='filled');
+  const filledHtml = filled.map(s=>`<div class="filled-line">✓ ${esc(s.label)} — ${esc((s.partner.slot && s.partner.slot.name) || 'speaker recorded')}${s.partner.slot && s.partner.slot.talk_number!=null ? ` — talk ${s.partner.slot.talk_number}` : ''}</div>`).join('');
+  if(!open.length){ area.innerHTML = filledHtml + `<p class="muted" style="margin-top:10px">All dates have a speaker recorded — thank you. If anything needs changing, please let Matt know.</p>`; return; }
+  const spkOpts = data.partner_speakers.map(p=>(p.talks||[]).length ? `<option value="${p.id}">${esc(p.masked || p.name)}</option>` : `<option value="${p.id}" disabled>${esc(p.masked || p.name)} — no talks on file</option>`).join('');
   area.innerHTML = `
-    <p class="muted">Please select from the dropdown — only type a name if your speaker isn't listed.</p>
-    ${openF3.map(s=>`
+    ${filledHtml ? `<div style="margin-bottom:12px">${filledHtml}</div>` : ''}
+    <p class="muted">Please select from the dropdown — only type a name if your speaker isn't listed. If you have no speaker available for a date, choose “Not available”.</p>
+    ${open.map(s=>`
       <div class="spk-row" data-date="${s.date}" style="border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px">
         <div style="font-size:13.5px;font-weight:600;margin-bottom:6px">${esc(s.label)}</div>
+        ${s.partner.state==='not_available' ? `<div class="na-note">Currently marked not available — choose a speaker below to change this.</div>` : ''}
         <select class="spk-select" data-date="${s.date}">
           <option value="">Select speaker…</option>
-          ${data.partner_speakers.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+          ${spkOpts}
           <option value="__new__">— Speaker not listed —</option>
+          <option value="__na__">— Not available (no speaker from us) —</option>
         </select>
         <input type="text" class="spk-name" data-date="${s.date}" placeholder="Speaker's name" style="display:none;margin-top:8px">
         <select class="spk-talk" data-date="${s.date}" style="margin-top:8px"><option value="">Select speaker first…</option></select>
         <div class="spk-error" data-date="${s.date}" style="color:var(--bad);font-size:12.5px;margin-top:6px;display:none"></div>
       </div>`).join('')}
-    <button class="green" id="submitSpeakersBtn" disabled>👤 Add speakers/talks</button>`;
+    <button class="green" id="submitSpeakersBtn" disabled>👥 Save speakers/talks</button>`;
   wireSpeakerSection();
 }
 
 function wireSpeakerSection(){
   const rows=[...document.querySelectorAll('.spk-row')];
-  function talksFor(speakerId,isNew){ if(isNew) return data.all_active_talks; const p=data.partner_speakers.find(x=>x.id===speakerId); return p?p.talks:[]; }
-  function populateTalks(row,speakerId,isNew){
-    const t=row.querySelector('.spk-talk'); const opts=talksFor(speakerId,isNew);
-    t.innerHTML = opts.length ? `<option value="">Select talk…</option>`+opts.map(n=>`<option value="${n}">${n}</option>`).join('') : `<option value="">No talks on file for this speaker</option>`;
+  function populateTalks(row,value){
+    const t=row.querySelector('.spk-talk');
+    if(value==='__na__'){ t.innerHTML='<option value="">Not needed</option>'; t.disabled=true; return; }
+    t.disabled=false;
+    if(value==='__new__'){ t.innerHTML=`<option value="">Select talk…</option>`+data.all_active_talks.map(n=>`<option value="${n}">${n}</option>`).join(''); return; }
+    const p=data.partner_speakers.find(x=>x.id===value);
+    if(!p){ t.innerHTML='<option value="">Select speaker first…</option>'; return; }
+    if(!(p.talks||[]).length){ t.innerHTML='<option value="">No talks on file for this speaker</option>'; return; }
+    const sug=p.suggested||[]; const rec=new Set(p.recent||[]); const rest=p.talks.filter(n=>!sug.includes(n));
+    t.innerHTML=`<option value="">Select talk…</option>`
+      +(sug.length?`<optgroup label="Suggested — longest since heard at Darlington West">${sug.map(n=>`<option value="${n}">${n}</option>`).join('')}</optgroup>`:'')
+      +(rest.length?`<optgroup label="Other talks">${rest.map(n=>`<option value="${n}">${n}${rec.has(n)?' (given at DW recently)':''}</option>`).join('')}</optgroup>`:'');
   }
   rows.forEach(row=>{
     const select=row.querySelector('.spk-select'), nameInput=row.querySelector('.spk-name');
-    select.addEventListener('change',()=>{ const isNew=select.value==='__new__'; nameInput.style.display=isNew?'block':'none'; populateTalks(row,select.value,isNew); validateSpeakers(); });
+    select.addEventListener('change',()=>{ nameInput.style.display=select.value==='__new__'?'block':'none'; populateTalks(row,select.value); validateSpeakers(); });
     nameInput.addEventListener('input',validateSpeakers);
     row.querySelector('.spk-talk').addEventListener('change',validateSpeakers);
   });
   document.getElementById('submitSpeakersBtn').addEventListener('click', async ()=>{
-    const entries=rows.map(row=>{
-      const select=row.querySelector('.spk-select'); const isNew=select.value==='__new__';
-      const talk=row.querySelector('.spk-talk').value; const entry={date:row.dataset.date,talk_number:Number(talk)};
-      if(isNew) entry.new_speaker_name=row.querySelector('.spk-name').value.trim(); else entry.speaker_id=select.value;
-      return entry;
-    }).filter(e=>e.speaker_id||e.new_speaker_name);
+    const entries=[];
+    rows.forEach(row=>{
+      const v=row.querySelector('.spk-select').value; if(!v) return;
+      if(v==='__na__'){ entries.push({date:row.dataset.date,not_available:true}); return; }
+      const e={date:row.dataset.date,talk_number:Number(row.querySelector('.spk-talk').value)};
+      if(v==='__new__') e.new_speaker_name=row.querySelector('.spk-name').value.trim(); else e.speaker_id=v;
+      entries.push(e);
+    });
     if(!entries.length) return;
     const btn=document.getElementById('submitSpeakersBtn'); btn.disabled=true;
     try{
       const res=await fetch(`${API}/booking-speaker-talk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:TOKEN,mx:expandedBooking,entries})});
-      const j=await res.json(); banner(j.ok,j.message); if(j.ok) await load(calYear); else btn.disabled=false;
+      const j=await res.json(); banner(j.ok,j.message); if(j.ok){ await load(calYear); scrollToTop(); } else btn.disabled=false;
     }catch(e){ banner(false,'Could not reach the server.'); btn.disabled=false; }
   });
   validateSpeakers();
@@ -498,6 +648,7 @@ function validateSpeakers(){
   let anyFilled=false, allValid=true;
   rows.forEach(row=>{
     const select=row.querySelector('.spk-select'), nameInput=row.querySelector('.spk-name'), talkSel=row.querySelector('.spk-talk'), errEl=row.querySelector('.spk-error');
+    if(select.value==='__na__'){ anyFilled=true; errEl.style.display='none'; return; }
     const isNew=select.value==='__new__';
     if(!select.value && !talkSel.value){ errEl.style.display='none'; return; }
     anyFilled=true;
@@ -513,7 +664,7 @@ function validateSpeakers(){
 
 function renderCancelDetail(){
   const area=document.getElementById('cancelDetail'); if(!area) return;
-  const b=data.current_exchanges.find(x=>x.mx_id===cancelBooking);
+  const b=data.current_exchanges.find(x=>x.mx_id===cancelBooking && x.cancellable);
   if(!b){ area.innerHTML=''; return; }
   area.innerHTML = `
     <div class="cancel-detail">You are cancelling an exchange with Darlington West for <strong>${esc(b.month_label)}</strong>.</div>
