@@ -147,7 +147,7 @@
 <script>
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get('t') || '';
-const URL_MODE = params.get('mode');   // speakers (opens Our + Your Speakers) | cancel | details | ourspeakers
+const URL_MODE = params.get('mode');   // speakers (opens Our + Your Speakers) | cancel | details | ourspeakers | yourspeakers
 const URL_MX = params.get('mx');
 const URL_CLAIM = params.get('claim'); // round-robin freed month YYYY-MM-01
 const API = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
@@ -163,7 +163,7 @@ let openInit = false;         // openSet is seeded from the URL once, then owned
 let didInitScroll = false;
 let view = 'hub';             // 'hub' | 'details'
 if (URL_MODE === 'details') view = 'details';
-if (URL_MODE === 'speakers' && URL_MX) expandedBooking = URL_MX;
+if ((URL_MODE === 'speakers' || URL_MODE === 'ourspeakers' || URL_MODE === 'yourspeakers') && URL_MX) expandedBooking = URL_MX;
 if (URL_MODE === 'cancel' && URL_MX) cancelBooking = URL_MX;
 
 function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -208,6 +208,7 @@ function initialOpenSet(){
   const s = new Set();
   if(URL_MODE === 'speakers'){ s.add('ourspeakers'); s.add('yourspeakers'); }
   if(URL_MODE === 'ourspeakers') s.add('ourspeakers');
+  if(URL_MODE === 'yourspeakers') s.add('yourspeakers');
   if(URL_MODE === 'cancel') s.add('cancel');
   if(URL_CLAIM) s.add('new');
   return s;
@@ -390,7 +391,7 @@ function renderHub(){
 
   if(!didInitScroll){
     didInitScroll = true;
-    const target = URL_MODE==='speakers' ? 'acc-ourspeakers' : URL_MODE==='cancel' ? 'acc-cancel' : URL_MODE==='ourspeakers' ? 'acc-ourspeakers' : URL_CLAIM ? 'acc-new' : null;
+    const target = URL_MODE==='speakers' ? 'acc-ourspeakers' : URL_MODE==='cancel' ? 'acc-cancel' : URL_MODE==='ourspeakers' ? 'acc-ourspeakers' : URL_MODE==='yourspeakers' ? 'acc-yourspeakers' : URL_CLAIM ? 'acc-new' : null;
     if(target) setTimeout(()=>{ const el=document.getElementById(target); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60);
   }
 }
