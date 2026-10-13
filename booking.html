@@ -139,6 +139,32 @@
   .cancel-detail{background:var(--red-bg);border:1px solid #e6b9b0;border-radius:6px;padding:12px 14px;font-size:14px;margin:12px 0}
   a.link-btn{font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline}
 
+  /* 👥 Manage your Speakers & Talks (very light blue) */
+  #acc-manage{background:#f2f7fb;border-color:#cddbe6}
+  .mgr-card{margin-top:14px;padding:12px 14px;background:#fff;border:1px solid #cddbe6;border-radius:8px}
+  .mgr-name{font-weight:600;font-size:16px}
+  .mgr-badge{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:10px;vertical-align:1px}
+  .mgr-badge.active{background:var(--ok-bg);color:var(--ok)}
+  .mgr-badge.inactive{background:var(--cooldown-bg);color:var(--cooldown)}
+  .mgr-badge.coord{background:var(--accent-bg);color:var(--accent)}
+  .mgr-meta{font-size:13.5px;color:var(--ink-soft);margin-top:6px;line-height:1.6}
+  .mgr-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .mgr-form{margin-top:14px;padding-top:14px;border-top:1px solid #cddbe6}
+  .mgr-field{margin-bottom:10px}
+  .mgr-hint{font-size:12px;color:var(--ink-soft);margin-top:4px}
+  .mgr-err{color:var(--bad);font-size:13px;margin:0 0 10px}
+  .mgr-err:empty{display:none}
+  .mgr-flash{padding:10px 13px;border-radius:6px;margin-bottom:12px;font-size:14px}
+  .mgr-flash.ok{background:var(--ok-bg);color:var(--ok)}
+  .mgr-flash.err{background:var(--bad-bg);color:var(--bad)}
+  .mgr-talks{list-style:none;padding:0;margin:0 0 12px}
+  .mgr-talks li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px solid #e3ecf3;font-size:14px}
+  .mgr-talks li:first-child{border-top:none}
+  .mgr-confirm{background:#fff8f6;border:1px solid #efcfc8;border-radius:6px;padding:12px 14px}
+  #mgrSelect{margin-bottom:0}
+  .dw-msg{flex:1 1 100%}
+  .dw-msg:empty{display:none}
+
   @media (max-width:480px){ .cal-grid{grid-template-columns:repeat(2,1fr)} }
 </style>
 </head>
@@ -147,7 +173,7 @@
 <script>
 const params = new URLSearchParams(location.search);
 const TOKEN = params.get('t') || '';
-const URL_MODE = params.get('mode');   // speakers (opens Our + Your Speakers) | cancel | details | ourspeakers | yourspeakers
+const URL_MODE = params.get('mode');   // speakers (opens Our + Your Speakers) | cancel | details | ourspeakers | yourspeakers | manage
 const URL_MX = params.get('mx');
 const URL_CLAIM = params.get('claim'); // round-robin freed month YYYY-MM-01
 const API = 'https://wgwmmxxryoyaiymrsyup.supabase.co/functions/v1';
@@ -158,7 +184,7 @@ let calYear = null;
 let selectedPreviewMonth = null;
 let expandedBooking = null;   // mx_id selected in container 1
 let cancelBooking = null;     // mx_id selected in container 3
-let openSet = new Set();      // which accordion containers are open: 'bookings'|'ourspeakers'|'yourspeakers'|'new'|'cancel'
+let openSet = new Set();      // which accordion containers are open: 'bookings'|'ourspeakers'|'yourspeakers'|'manage'|'new'|'cancel'
 let openInit = false;         // openSet is seeded from the URL once, then owned by the visitor
 let didInitScroll = false;
 let view = 'hub';             // 'hub' | 'details'
@@ -210,6 +236,7 @@ function initialOpenSet(){
   if(URL_MODE === 'ourspeakers') s.add('ourspeakers');
   if(URL_MODE === 'yourspeakers') s.add('yourspeakers');
   if(URL_MODE === 'cancel') s.add('cancel');
+  if(URL_MODE === 'manage') s.add('manage');
   if(URL_CLAIM) s.add('new');
   return s;
 }
@@ -301,7 +328,14 @@ function renderHub(){
 
     <hr class="sep">
 
-    <!-- 👥 Manage your Speakers & Talks (light blue) goes HERE - not built yet, see handoff v7 Section J -->
+    <!-- 👥 Manage your Speakers & Talks (very light blue). Not month-gated. Hidden if the payload has no manage_speakers (older function). -->
+    ${Array.isArray(data.manage_speakers) ? `
+    <div class="acc ${openSet.has('manage')?'open':''}" id="acc-manage">
+      ${accHead('manage','👥 Manage your Speakers & Talks')}
+      <div class="acc-body">
+        <div id="manageArea"></div>
+      </div>
+    </div>` : ''}
 
     <!-- Container 2 (not rendered at all when the congregation's cooperation_score is 0) -->
     ${newAllowed ? `
@@ -383,6 +417,7 @@ function renderHub(){
 
   wireExchangeAreas();
   renderYourRoster();
+  renderManage();
   const csel = document.getElementById('cancelSelect');
   if(csel){
     csel.addEventListener('change', e=>{ cancelBooking = e.target.value || null; renderCancelDetail(); });
@@ -391,7 +426,7 @@ function renderHub(){
 
   if(!didInitScroll){
     didInitScroll = true;
-    const target = URL_MODE==='speakers' ? 'acc-ourspeakers' : URL_MODE==='cancel' ? 'acc-cancel' : URL_MODE==='ourspeakers' ? 'acc-ourspeakers' : URL_MODE==='yourspeakers' ? 'acc-yourspeakers' : URL_CLAIM ? 'acc-new' : null;
+    const target = URL_MODE==='speakers' ? 'acc-ourspeakers' : URL_MODE==='cancel' ? 'acc-cancel' : URL_MODE==='ourspeakers' ? 'acc-ourspeakers' : URL_MODE==='yourspeakers' ? 'acc-yourspeakers' : URL_MODE==='manage' ? 'acc-manage' : URL_CLAIM ? 'acc-new' : null;
     if(target) setTimeout(()=>{ const el=document.getElementById(target); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60);
   }
 }
@@ -602,6 +637,19 @@ async function postDwPref(slotId, talk, final){
   const res = await fetch(`${API}/booking-dw-talk-pref`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   return res.json();
 }
+// What the coordinator sees after a dropdown pick: it is only a PREFERENCE until Confirm talk is pressed (single-speaker dates)
+// or until Matt confirms with the speaker (several speakers proposed for the date).
+const DW_PREF_SAVED_SINGLE = 'Saved as a preference. Press Confirm talk to finalise it and let the speaker know.';
+const DW_PREF_SAVED_MULTI = 'Saved as a preference. Matt will confirm with the speaker.';
+function dwSlotIsMulti(slotId){
+  const b = selectedBooking(); if(!b) return false;
+  const s = b.sundays.find(x=>(x.dw.slots||[]).some(sl=>sl.slot_id===slotId));
+  return !!s && (s.dw.slots||[]).length > 1;
+}
+function dwPrefSavedText(slotId, talk){
+  if(talk === null) return 'Preference cleared.';
+  return dwSlotIsMulti(slotId) ? DW_PREF_SAVED_MULTI : DW_PREF_SAVED_SINGLE;
+}
 // mirrors the server's choose-one rule locally so the page needs no reload
 function applyPrefLocally(slotId, talk){
   const b = selectedBooking();
@@ -618,7 +666,7 @@ async function saveDwPref(sel){
   sel.disabled = true; msg.className = 'dw-msg muted'; msg.textContent = 'Saving…';
   try{
     const j = await postDwPref(slotId, val===''?null:Number(val));
-    if(j.ok){ applyPrefLocally(slotId, val===''?null:Number(val)); renderDwDates(slotId); }
+    if(j.ok){ const picked = val===''?null:Number(val); applyPrefLocally(slotId, picked); renderDwDates(slotId, dwPrefSavedText(slotId, picked)); }
     else { sel.value = prev; sel.disabled = false; msg.className = 'dw-msg dw-err'; msg.textContent = j.message || 'Could not save.'; }
   }catch(e){ sel.value = prev; sel.disabled = false; msg.className = 'dw-msg dw-err'; msg.textContent = 'Could not reach the server.'; }
 }
@@ -639,7 +687,7 @@ async function confirmDwTalk(btn){
         const b = selectedBooking();
         b.sundays.forEach(s=>(s.dw.slots||[]).forEach(sl=>{ if(sl.slot_id===slotId){ sl.talk_number = talk; sl.preferred_talk = talk; sl.status = 'confirmed'; sl.just_confirmed = true; } }));
         renderDwDates();
-      } else { applyPrefLocally(slotId, talk); renderDwDates(slotId); }
+      } else { applyPrefLocally(slotId, talk); renderDwDates(slotId, DW_PREF_SAVED_MULTI); }
     } else { btn.disabled = false; if(sel) sel.disabled = false; msg.className = 'dw-msg dw-err'; msg.textContent = j.message || 'Could not confirm.'; }
   }catch(e){ btn.disabled = false; if(sel) sel.disabled = false; msg.className = 'dw-msg dw-err'; msg.textContent = 'Could not reach the server.'; }
 }
@@ -784,6 +832,259 @@ function renderCancelDetail(){
       const j=await res.json(); banner(j.ok,j.message); if(j.ok){ cancelBooking=null; await load(calYear); scrollToTop(); } else btn.disabled=false;
     }catch(e){ banner(false,'Could not reach the server.'); btn.disabled=false; }
   });
+}
+
+// ── 👥 Manage your Speakers & Talks ───────────────────────────────────────
+// Talks to booking-speaker-manage (add_speaker | edit_speaker | set_active | add_talk | remove_talk) and reads
+// data.manage_speakers / data.talk_titles from booking-options. The validators below mirror
+// booking-speaker-manage/helpers.ts (shared vectors in validator_vectors.json); the SERVER stays the authority.
+const MGR_NAME_RE = /^[\p{L}\p{M}][\p{L}\p{M} .'’-]*$/u;
+const MGR_EMAIL_RE = /^[^\s@;,<>()\[\]\\"]+@[^\s@;,<>()\[\]\\"]+\.[^\s@;,<>()\[\]\\"]{2,}$/;
+function mgrClean(s){ return String(s==null?'':s).normalize('NFC').replace(/\s+/g,' ').trim(); }
+function mgrValidateName(raw,label){
+  const v = mgrClean(raw);
+  if(!v) return {ok:false,message:`Please enter a ${label}.`};
+  if(v.length > 40) return {ok:false,message:`The ${label} is too long.`};
+  if(!MGR_NAME_RE.test(v)) return {ok:false,message:`The ${label} can only contain letters, spaces, hyphens and apostrophes.`};
+  return {ok:true,value:v};
+}
+function mgrNameKey(first,last){ return mgrClean(first+' '+last).toLowerCase().normalize('NFD').replace(/\p{M}/gu,''); }
+function mgrValidateEmail(raw){
+  const v = mgrClean(raw).toLowerCase();
+  if(v === '') return {ok:true,value:''};
+  if(v.length > 120 || !MGR_EMAIL_RE.test(v)) return {ok:false,message:'Please enter a valid email address.'};
+  if(v.endsWith('@jwpub.org')) return {ok:false,message:'Please use a personal email address, not a jwpub.org one.'};
+  return {ok:true,value:v};
+}
+function mgrNormaliseMobile(raw){
+  const original = mgrClean(raw);
+  if(original === '') return {ok:true,value:''};
+  let s = original.replace(/\(0\)/g,'').replace(/[\s\-().]/g,'');
+  if(s.startsWith('+')) s = s.slice(1);
+  if(s.startsWith('00')) s = s.slice(2);
+  if(s.startsWith('44')) s = '0' + s.slice(2);
+  if(!/^07[1-57-9]\d{8}$/.test(s)) return {ok:false,message:'Please enter a UK mobile number, for example 07123 456789.'};
+  return {ok:true,value:'+44' + s.slice(1)};
+}
+
+let mgrSel = null;     // speaker id | '__new__' | null
+let mgrForm = null;    // 'add' | 'edit' | 'talks' | 'deact' | 'react' | null  (one form open at a time)
+let mgrFlash = null;   // {ok, text} - result of the last action, shown at the top of the container
+let mgrBusy = false;
+
+function mgrList(){ return Array.isArray(data && data.manage_speakers) ? data.manage_speakers : null; }
+function mgrFind(id){ return (mgrList() || []).find(s=>s.id===id) || null; }
+function mgrFull(s){ return `${s.firstname||''} ${s.surname||''}`.trim(); }
+function mgrTalkList(){
+  const t = data.talk_titles && Object.keys(data.talk_titles).length ? Object.keys(data.talk_titles).map(Number) : (data.all_active_talks || []).slice();
+  return t.sort((a,b)=>a-b);
+}
+function mgrTalkLabel(n){ const t = data.talk_titles && data.talk_titles[String(n)]; return t ? `${n} — ${t}` : String(n); }
+function mgrSortList(){ mgrList().sort((a,b)=>(a.surname||'').localeCompare(b.surname||'') || (a.firstname||'').localeCompare(b.firstname||'')); }
+
+function mgrCardHtml(sp){
+  const coord = !!sp.is_coordinator;
+  const talks = sp.talks && sp.talks.length ? sp.talks.join(', ') : 'none yet';
+  const btn = (act, label, cls) => `<button type="button" class="small ${cls||'secondary'}" data-mgr="${act}">${label}</button>`;
+  return `
+    <div class="mgr-card">
+      <div><span class="mgr-name">${esc(mgrFull(sp))}</span> <span class="mgr-badge ${sp.is_active?'active':'inactive'}">${sp.is_active?'Active':'Inactive'}</span>${coord?' <span class="mgr-badge coord">Coordinator</span>':''}</div>
+      <div class="mgr-meta">Email: ${sp.email ? esc(sp.email) : '<i>not on file</i>'}<br>Mobile: ${sp.mobile ? esc(sp.mobile) : '<i>not on file</i>'}<br>Talks: ${esc(talks)}</div>
+      ${coord ? `<p class="muted" style="margin:10px 0 0">Your own name, email and mobile are updated with the link at the bottom of this page. Here you can only change your talks list.</p>` : ''}
+      <div class="mgr-actions">
+        ${coord ? '' : btn('open-edit','Edit details')}
+        ${btn('open-talks','Update talks list')}
+        ${coord ? '' : (sp.is_active ? btn('open-deact','Deactivate speaker','redlight') : btn('open-react','Reactivate speaker','green'))}
+      </div>
+      ${mgrFormHtml(sp)}
+    </div>`;
+}
+
+function mgrField(id, label, value, hint, mode){
+  return `<div class="mgr-field"><label for="${id}">${label}</label><input type="text" id="${id}" value="${esc(value||'')}" autocomplete="off"${mode?` inputmode="${mode}"`:''}>${hint?`<div class="mgr-hint">${hint}</div>`:''}</div>`;
+}
+
+function mgrFormHtml(sp){
+  if(mgrForm === 'edit'){
+    return `
+      <div class="mgr-form" id="mgrFormBox">
+        <h4 class="sec">Edit details — ${esc(mgrFull(sp))}</h4>
+        ${mgrField('mgrFirst','First name',sp.firstname)}
+        ${mgrField('mgrSur','Surname',sp.surname)}
+        ${mgrField('mgrEmail','Email',sp.email,'Optional. Please use a personal email, not a jwpub.org one.','email')}
+        ${mgrField('mgrMobile','Mobile',sp.mobile,'A UK mobile, for example 07123 456789.','tel')}
+        <div class="mgr-err" id="mgrFormErr"></div>
+        <div class="row"><button type="button" class="green" data-mgr="save-edit">Save details</button><button type="button" class="secondary" data-mgr="close">Cancel</button></div>
+      </div>`;
+  }
+  if(mgrForm === 'talks'){
+    const have = new Set(sp.talks || []);
+    const avail = mgrTalkList().filter(n=>!have.has(n));
+    const list = (sp.talks || []).map(n=>`<li><span>${esc(mgrTalkLabel(n))}</span><button type="button" class="small redlight" data-mgr="rm-talk" data-talk="${n}">Remove</button></li>`).join('');
+    return `
+      <div class="mgr-form" id="mgrFormBox">
+        <h4 class="sec">Update talks list — ${esc(mgrFull(sp))}</h4>
+        ${list ? `<ul class="mgr-talks">${list}</ul>` : `<p class="muted">No talks on this speaker’s list yet.</p>`}
+        <div class="mgr-field"><label for="mgrTalkPick">Add a talk</label>
+          <div class="row" style="margin-bottom:0"><select id="mgrTalkPick"><option value="">Choose a talk…</option>${avail.map(n=>`<option value="${n}">${esc(mgrTalkLabel(n))}</option>`).join('')}</select>
+          <button type="button" class="green small" data-mgr="add-talk">Add talk</button></div></div>
+        <div class="mgr-err" id="mgrFormErr"></div>
+        <button type="button" class="secondary small" data-mgr="close">Done</button>
+      </div>`;
+  }
+  if(mgrForm === 'deact' || mgrForm === 'react'){
+    const deact = mgrForm === 'deact';
+    return `
+      <div class="mgr-form mgr-confirm" id="mgrFormBox">
+        <p style="margin:0 0 10px"><b>${deact?'Deactivate':'Reactivate'} ${esc(mgrFull(sp))}?</b><br>${deact
+          ? 'He will no longer be offered for exchange dates. His details and talks are kept, and you can reactivate him at any time.'
+          : 'He will be offered for exchange dates again.'}</p>
+        <div class="mgr-err" id="mgrFormErr"></div>
+        <div class="row"><button type="button" class="${deact?'red':'green'}" data-mgr="${deact?'confirm-deact':'confirm-react'}">Yes, ${deact?'deactivate':'reactivate'}</button><button type="button" class="secondary" data-mgr="close">Cancel</button></div>
+      </div>`;
+  }
+  return '';
+}
+
+function mgrAddHtml(){
+  return `
+    <div class="mgr-card">
+      <div class="mgr-form" id="mgrFormBox" style="margin-top:0;padding-top:0;border-top:none">
+        <h4 class="sec">Add a new speaker</h4>
+        ${mgrField('mgrFirst','First name','')}
+        ${mgrField('mgrSur','Surname','')}
+        ${mgrField('mgrEmail','Email','','Optional. Please use a personal email, not a jwpub.org one.','email')}
+        ${mgrField('mgrMobile','Mobile','','Optional, but needed so he can be contacted about his talks. A UK mobile, for example 07123 456789.','tel')}
+        <div class="mgr-err" id="mgrFormErr"></div>
+        <div class="row"><button type="button" class="green" data-mgr="save-add">Add speaker</button><button type="button" class="secondary" data-mgr="cancel-add">Cancel</button></div>
+        <p class="muted" style="margin:0">You can add his talks straight after he’s been added.</p>
+      </div>
+    </div>`;
+}
+
+function renderManage(){
+  const area = document.getElementById('manageArea'); if(!area) return;
+  const list = mgrList(); if(!list){ area.innerHTML=''; return; }
+  if(mgrSel && mgrSel !== '__new__' && !mgrFind(mgrSel)){ mgrSel = null; mgrForm = null; }
+  const sp = mgrSel && mgrSel !== '__new__' ? mgrFind(mgrSel) : null;
+  const opts = list.map(s=>`<option value="${esc(s.id)}"${s.id===mgrSel?' selected':''}>${esc(mgrFull(s))}${s.is_coordinator?' — Coordinator':''}${s.is_active?'':' — inactive'}</option>`).join('');
+  area.innerHTML = `
+    <p class="muted sub-first">Add speakers, update their details and keep each speaker’s talks list up to date. Changes save straight away.</p>
+    ${mgrFlash ? `<div class="mgr-flash ${mgrFlash.ok?'ok':'err'}" id="mgrFlash">${esc(mgrFlash.text)}</div>` : ''}
+    <label for="mgrSelect">Speaker</label>
+    <select id="mgrSelect">
+      <option value="">${list.length?'Choose a speaker…':'No speakers on file yet'}</option>
+      ${opts}
+      <option value="__new__"${mgrSel==='__new__'?' selected':''}>＋ Add a new speaker</option>
+    </select>
+    ${mgrSel==='__new__' ? mgrAddHtml() : (sp ? mgrCardHtml(sp) : '')}`;
+  document.getElementById('mgrSelect').addEventListener('change', e=>{
+    const v = e.target.value;
+    mgrSel = v || null; mgrForm = v === '__new__' ? 'add' : null; mgrFlash = null;
+    renderManage();
+  });
+  area.querySelectorAll('[data-mgr]').forEach(b=>b.addEventListener('click', ()=>mgrAction(b.dataset.mgr, b)));
+}
+
+function mgrErr(text){ const el = document.getElementById('mgrFormErr'); if(el) el.textContent = text || ''; }
+function mgrVal(id){ const el = document.getElementById(id); return el ? el.value : ''; }
+
+// Client-side checks that mirror the server (changed fields only on edit). Returns an error string, or '' when fine.
+function mgrCheckAdd(){
+  const fn = mgrValidateName(mgrVal('mgrFirst'),'first name'); if(!fn.ok) return fn.message;
+  const sn = mgrValidateName(mgrVal('mgrSur'),'surname'); if(!sn.ok) return sn.message;
+  const em = mgrValidateEmail(mgrVal('mgrEmail')); if(!em.ok) return em.message;
+  const mo = mgrNormaliseMobile(mgrVal('mgrMobile')); if(!mo.ok) return mo.message;
+  return mgrDupName(fn.value, sn.value, null);
+}
+function mgrDupName(first,last,exceptId){
+  const key = mgrNameKey(first,last);
+  const hit = (mgrList() || []).find(s=>s.id !== exceptId && mgrNameKey(s.firstname||'', s.surname||'') === key);
+  if(!hit) return '';
+  return hit.is_active ? `${first} ${last} is already on your list.`
+    : `${first} ${last} is already on your list but is currently inactive — choose him from the speaker list and select “Reactivate speaker”.`;
+}
+function mgrCheckEdit(sp){
+  let nf = sp.firstname || '', ns = sp.surname || '';
+  if(mgrClean(mgrVal('mgrFirst')) !== mgrClean(sp.firstname)){ const r = mgrValidateName(mgrVal('mgrFirst'),'first name'); if(!r.ok) return r.message; nf = r.value; }
+  if(mgrClean(mgrVal('mgrSur')) !== mgrClean(sp.surname)){ const r = mgrValidateName(mgrVal('mgrSur'),'surname'); if(!r.ok) return r.message; ns = r.value; }
+  const nameChanged = nf !== (sp.firstname || '') || ns !== (sp.surname || '');
+  let emailChanged = false;
+  const rawEmail = mgrClean(mgrVal('mgrEmail')).toLowerCase();
+  if(rawEmail !== (sp.email || '').toLowerCase()){ const r = mgrValidateEmail(rawEmail); if(!r.ok) return r.message; emailChanged = true; }
+  let mobileChanged = false;
+  const rawMobile = mgrClean(mgrVal('mgrMobile'));
+  if(rawMobile === ''){ if(sp.mobile) return 'To remove a mobile number please contact Matt.'; }
+  else if(rawMobile !== sp.mobile){ const r = mgrNormaliseMobile(rawMobile); if(!r.ok) return r.message; if(r.value !== sp.mobile) mobileChanged = true; }
+  if(!nameChanged && !emailChanged && !mobileChanged) return 'No changes to save.';
+  return nameChanged ? mgrDupName(nf, ns, sp.id) : '';
+}
+
+async function mgrPost(payload){
+  const res = await fetch(`${API}/booking-speaker-manage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:TOKEN,...payload})});
+  return res.json();
+}
+function mgrApply(speaker){
+  if(!speaker || !speaker.id) return;
+  const list = mgrList(); const i = list.findIndex(s=>s.id===speaker.id);
+  if(i >= 0) list[i] = speaker; else list.push(speaker);
+  mgrSortList();
+}
+
+// Runs one write. `after(j)` returns the next {form, flash, sel?}; on failure the message is shown inside the open form.
+async function mgrRun(btn, payload, after){
+  if(mgrBusy) return;
+  mgrBusy = true; mgrErr('');
+  const box = document.getElementById('mgrFormBox');
+  const btns = box ? [...box.querySelectorAll('button')] : [btn];
+  btns.forEach(b=>b.disabled = true);
+  try{
+    const j = await mgrPost(payload);
+    if(j.ok){
+      mgrApply(j.speaker);
+      const nx = after(j);
+      mgrForm = nx.form; mgrFlash = nx.flash === undefined ? {ok:true,text:j.message} : nx.flash;
+      if(nx.sel !== undefined) mgrSel = nx.sel;
+      mgrBusy = false; renderManage();
+    } else {
+      mgrBusy = false; btns.forEach(b=>b.disabled = false); mgrErr(j.message || 'Couldn’t save that — please try again.');
+    }
+  }catch(e){
+    mgrBusy = false; btns.forEach(b=>b.disabled = false); mgrErr('Could not reach the server — please try again.');
+  }
+}
+
+function mgrAction(act, btn){
+  const sp = mgrSel && mgrSel !== '__new__' ? mgrFind(mgrSel) : null;
+  if(mgrBusy) return;
+  if(act === 'open-edit'){ mgrForm = 'edit'; mgrFlash = null; return renderManage(); }
+  if(act === 'open-talks'){ mgrForm = 'talks'; mgrFlash = null; return renderManage(); }
+  if(act === 'open-deact'){ mgrForm = 'deact'; mgrFlash = null; return renderManage(); }
+  if(act === 'open-react'){ mgrForm = 'react'; mgrFlash = null; return renderManage(); }
+  if(act === 'close'){ mgrForm = null; return renderManage(); }
+  if(act === 'cancel-add'){ mgrSel = null; mgrForm = null; return renderManage(); }
+  if(act === 'save-add'){
+    const err = mgrCheckAdd(); if(err) return mgrErr(err);
+    return mgrRun(btn, {action:'add_speaker',firstname:mgrVal('mgrFirst'),surname:mgrVal('mgrSur'),email:mgrVal('mgrEmail'),mobile:mgrVal('mgrMobile')},
+      j=>({form:'talks',sel:j.speaker.id,flash:{ok:true,text:`${j.message} Now add the talks he can give.`}}));
+  }
+  if(!sp) return;
+  if(act === 'save-edit'){
+    const err = mgrCheckEdit(sp); if(err) return mgrErr(err);
+    return mgrRun(btn, {action:'edit_speaker',speaker_id:sp.id,firstname:mgrVal('mgrFirst'),surname:mgrVal('mgrSur'),email:mgrVal('mgrEmail'),mobile:mgrVal('mgrMobile')}, ()=>({form:null}));
+  }
+  if(act === 'confirm-deact') return mgrRun(btn, {action:'set_active',speaker_id:sp.id,active:false}, ()=>({form:null}));
+  if(act === 'confirm-react') return mgrRun(btn, {action:'set_active',speaker_id:sp.id,active:true}, ()=>({form:null}));
+  if(act === 'add-talk'){
+    const n = Number(mgrVal('mgrTalkPick'));
+    if(!n) return mgrErr('Please choose a talk.');
+    return mgrRun(btn, {action:'add_talk',speaker_id:sp.id,talk_number:n}, ()=>({form:'talks'}));
+  }
+  if(act === 'rm-talk'){
+    const n = Number(btn.dataset.talk);
+    if(!window.confirm(`Remove talk ${n} from ${mgrFull(sp)}’s list?`)) return;
+    return mgrRun(btn, {action:'remove_talk',speaker_id:sp.id,talk_number:n}, ()=>({form:'talks'}));
+  }
 }
 
 // ── Details view (separate) ────────────────────────────────────────────
