@@ -71,11 +71,16 @@
   .cal-month.selected{outline:2px solid var(--accent);outline-offset:1px}
   .pref-note{background:var(--accent-bg);border:1px solid #c9dae3;border-radius:6px;padding:9px 14px;font-size:13px;color:var(--accent);margin-bottom:16px}
   .pref-badge{display:inline-block;background:var(--accent-bg);color:var(--accent);font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:10px;margin-bottom:8px}
-  .dws-row{display:grid;grid-template-columns:130px 1fr;gap:4px 14px;padding:9px 0;border-top:1px solid var(--rule);font-size:14px}
+  .dws-row{display:grid;grid-template-columns:200px 1fr;gap:4px 14px;padding:9px 0;border-top:1px solid var(--rule);font-size:14px}
   .dws-row:first-child{border-top:none}
   .dws-name{font-weight:600}
   .dws-talks{color:var(--ink-soft);font-variant-numeric:tabular-nums;line-height:1.6}
   @media (max-width:480px){ .dws-row{grid-template-columns:1fr} }
+  .roster-mail{margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)}
+  .roster-mail .roster-note{font-size:12.5px;margin-top:6px}
+  .roster-msg{font-size:13.5px;margin-top:8px;padding:8px 10px;border-radius:6px}
+  .roster-msg.ok{background:var(--avail-bg);color:var(--ink)}
+  .roster-msg.err{color:var(--bad);border:1px solid var(--bad)}
   /* Our Speakers / Your Speakers */
   .exch-label{font-size:13px;color:var(--ink-soft);margin-bottom:12px}
   .dw-row{padding:11px 0;border-top:1px solid #eef0f2}
@@ -195,6 +200,8 @@ if (URL_MODE === 'cancel' && URL_MX) cancelBooking = URL_MX;
 function esc(s){return s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function monthLabelFromValue(v){const M=['January','February','March','April','May','June','July','August','September','October','November','December'];const [y,m]=v.split('-').map(Number);return `${M[m-1]} ${y}`;}
 
+// A message to show once the next load() has re-rendered the page (render() rebuilds #banner, so a banner set before load() is lost).
+let stickyBanner = null;
 async function load(year, previewMonth){
   if(!TOKEN){app.innerHTML='<h1>Exchanges</h1><div class="err-box">This page needs a valid link. Check the email you were sent, or ask Matt for a fresh one.</div>';return;}
   let q = `?t=${encodeURIComponent(TOKEN)}`;
@@ -224,6 +231,7 @@ async function load(year, previewMonth){
     data = json;
     if(!calYear) calYear = json.calendar_year.year;
     render();
+    if(stickyBanner){ banner(stickyBanner.ok, stickyBanner.msg); stickyBanner = null; }
   }catch(e){
     app.innerHTML = '<h1>Exchanges</h1><div class="err-box">Could not reach the server.</div>';
   }
@@ -247,10 +255,13 @@ function render(){
   renderHub();
 }
 
+// Display-only suffix: ministerial servants show "(M.S)" after the name. Never used for edit inputs, ids, matching or POST bodies.
+function dispName(name, appointment){ return appointment === 'ministerial servant' ? `${name} (M.S)` : name; }
+
 function renderOurSpeakers(){
   const list = data.dw_speakers || [];
   if(!list.length) return '<p class="muted">No speaker details are available yet.</p>';
-  return list.map(s=>`<div class="dws-row"><div class="dws-name">${esc(s.name)}</div><div class="dws-talks">${s.talks.join(', ')}</div></div>`).join('');
+  return list.map(s=>`<div class="dws-row"><div class="dws-name">${esc(dispName(s.name, s.appointment))}</div><div class="dws-talks">${s.talks.join(', ')}</div></div>`).join('');
 }
 
 function accHead(key, label){
@@ -309,6 +320,12 @@ function renderHub(){
           <h4 class="sec">All our speakers and their talks</h4>
           <p class="muted sub-first">Darlington West's speakers who are available for exchanges, and the talk outlines each has on record. This list is kept up to date automatically.</p>
           ${renderOurSpeakers()}
+          ${(data.dw_speakers||[]).length ? `
+          <div class="roster-mail">
+            <button class="secondary" id="rosterEmailBtn">✉️ Email me this list with their phone numbers</button>
+            <div class="muted roster-note">Sent to the email address we hold for your Public Talk Coordinator. Phone numbers are never shown on this page.</div>
+            <div id="rosterMsg" aria-live="polite"></div>
+          </div>` : ''}
         </div>
       </div>
     </div>
@@ -405,6 +422,8 @@ function renderHub(){
   });
 
   document.getElementById('detailsLink').addEventListener('click', ()=>{ view='details'; render(); scrollToTop(); });
+  const rosterBtn = document.getElementById('rosterEmailBtn');
+  if(rosterBtn) rosterBtn.addEventListener('click', ()=>emailRoster(rosterBtn));
   const claimBtn = document.getElementById('claimBook');
   if(claimBtn) claimBtn.addEventListener('click', (e)=>submitBooking(URL_CLAIM, e));
   if(na){ const hb=document.getElementById('heroBook'); if(hb) hb.addEventListener('click',(e)=>submitBooking(na.value,e)); }
@@ -569,7 +588,7 @@ function talksWithPref(sl){
 }
 // Row text: "Name (22, 36, ★ 69, 93)" + "| ★ = Preferred talk" only when a preferred talk exists on this row.
 function dwLine(sl){
-  const name = `<b>${esc(sl.name)}</b>`;
+  const name = `<b>${esc(dispName(sl.name, sl.appointment))}</b>`;
   if(sl.talk_number != null) return `${name} | Talk: ${sl.talk_number}${sl.just_confirmed ? ' <span class="dw-saved">✓ Confirmed</span>' : ''}`;
   const talks = talksWithPref(sl);
   const list = talks.length ? talks.map(n=> n === sl.preferred_talk ? `★ ${n}` : String(n)).join(', ') : 'no talks on file';
@@ -711,8 +730,8 @@ function renderYourRoster(){
   const r = data.your_roster || { state:'no_record', rows:[] };
   let body;
   if(r.state === 'normal'){
-    body = `<p class="muted sub-first">Listed in preference order — first means longest since we last heard it at Darlington West. Outlines given here in the last 6 months are left out.</p>`
-         + r.rows.map(x=>`<div class="roster-line"><b>${esc(x.name)}</b> (${x.talks.join(', ')})</div>`).join('');
+    body = `<p class="muted sub-first">Below are the outlines from your speakers we would like to hear at Darlington West. They are listed in preference order - first means longest since we last heard it at Darlington West. You can view the full outlines we have for each speaker in the 'Manage your Speakers' section.</p>`
+         + r.rows.map(x=>`<div class="roster-line"><b>${esc(dispName(x.name, x.appointment))}</b> (${x.talks.join(', ')})</div>`).join('');
   } else if(r.state === 'all_filtered'){
     body = `<p class="muted sub-first">All of your speakers' outlines (${esc(r.excluded_list)}) have been given at Darlington West in the last 6 months. Please check your speakers' talk lists are up to date.</p>`;
   } else {
@@ -729,11 +748,12 @@ function renderSpeakerArea(){
   if(!dates.length){ area.innerHTML='<p class="muted">No dates this month need a speaker from your side.</p>'; return; }
   const filled = dates.filter(s=>s.partner.state==='filled');
   const open = dates.filter(s=>s.partner.state!=='filled');
-  const filledHtml = filled.map(s=>`<div class="filled-line">✓ ${esc(s.label)} — ${esc((s.partner.slot && s.partner.slot.name) || 'speaker recorded')}${s.partner.slot && s.partner.slot.talk_number!=null ? ` — talk ${s.partner.slot.talk_number}` : ''}</div>`).join('');
+  const filledHtml = filled.map(s=>`<div class="filled-line">✓ ${esc(s.label)} — ${esc(s.partner.slot && s.partner.slot.name ? dispName(s.partner.slot.name, s.partner.slot.appointment) : 'speaker recorded')}${s.partner.slot && s.partner.slot.talk_number!=null ? ` — talk ${s.partner.slot.talk_number}` : ''}</div>`).join('');
   if(!open.length){ area.innerHTML = filledHtml + `<p class="muted" style="margin-top:10px">All dates have a speaker recorded — thank you. If anything needs changing, please let Matt know.</p>`; return; }
-  const spkOpts = data.partner_speakers.map(p=>(p.suggested||[]).length ? `<option value="${p.id}">${esc(p.masked || p.name)}</option>` : `<option value="${p.id}" disabled>${esc(p.masked || p.name)} — no suggested talks available</option>`).join('');
+  const spkOpts = data.partner_speakers.map(p=>(p.suggested||[]).length ? `<option value="${p.id}">${esc(dispName(p.name, p.appointment))}</option>` : `<option value="${p.id}" disabled>${esc(dispName(p.name, p.appointment))} — no suggested talks available</option>`).join('');
   area.innerHTML = `
     ${filledHtml ? `<div style="margin-bottom:12px">${filledHtml}</div>` : ''}
+    <p class="muted">You don't have to fill in every date at once — save the dates you're sure of now and come back later for the rest.</p>
     <p class="muted">Please select from the dropdown — only type a name if your speaker isn't listed. Each speaker's dropdown offers the talks we'd most like to hear from them (the same list shown above). If you have no speaker available for a date, choose “Not available”.</p>
     ${open.map(s=>`
       <div class="spk-row" data-date="${s.date}" style="border:1px solid var(--rule);border-radius:6px;padding:10px;margin-bottom:10px">
@@ -751,6 +771,12 @@ function renderSpeakerArea(){
       </div>`).join('')}
     <button class="green" id="submitSpeakersBtn" disabled>👥 Save speakers/talks</button>`;
   wireSpeakerSection();
+}
+
+// The server saves all-or-nothing: a refusal means none of the dates sent were saved.
+function spkRefusal(n, msg){
+  const m = (msg || 'Something went wrong.').trim();
+  return `Nothing was saved (${n} date${n===1?'':'s'} sent). ${m} You can fix that date, or leave it blank and save the others.`;
 }
 
 function wireSpeakerSection(){
@@ -785,8 +811,15 @@ function wireSpeakerSection(){
     const btn=document.getElementById('submitSpeakersBtn'); btn.disabled=true;
     try{
       const res=await fetch(`${API}/booking-speaker-talk`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:TOKEN,mx:expandedBooking,entries})});
-      const j=await res.json(); banner(j.ok,j.message); if(j.ok){ await load(calYear); scrollToTop(); } else btn.disabled=false;
-    }catch(e){ banner(false,'Could not reach the server.'); btn.disabled=false; }
+      const j=await res.json();
+      if(j.ok){
+        const left=rows.length-entries.length;
+        stickyBanner = { ok:true, msg: left>0 ? `${j.message} ${left} date${left===1?'':'s'} still need${left===1?'s':''} a speaker — you can add ${left===1?'it':'those'} later.` : j.message };
+        await load(calYear); scrollToTop();
+      } else {
+        banner(false, spkRefusal(entries.length, j.message)); btn.disabled=false;
+      }
+    }catch(e){ banner(false,'Could not reach the server — please check your connection. If you are unsure whether it saved, refresh the page to see what is recorded.'); btn.disabled=false; }
   });
   validateSpeakers();
 }
@@ -875,6 +908,7 @@ let mgrBusy = false;
 function mgrList(){ return Array.isArray(data && data.manage_speakers) ? data.manage_speakers : null; }
 function mgrFind(id){ return (mgrList() || []).find(s=>s.id===id) || null; }
 function mgrFull(s){ return `${s.firstname||''} ${s.surname||''}`.trim(); }
+function mgrShow(s){ return dispName(mgrFull(s), s.appointment); }
 function mgrTalkList(){
   const t = data.talk_titles && Object.keys(data.talk_titles).length ? Object.keys(data.talk_titles).map(Number) : (data.all_active_talks || []).slice();
   return t.sort((a,b)=>a-b);
@@ -888,7 +922,7 @@ function mgrCardHtml(sp){
   const btn = (act, label, cls) => `<button type="button" class="small ${cls||'secondary'}" data-mgr="${act}">${label}</button>`;
   return `
     <div class="mgr-card">
-      <div><span class="mgr-name">${esc(mgrFull(sp))}</span> <span class="mgr-badge ${sp.is_active?'active':'inactive'}">${sp.is_active?'Active':'Inactive'}</span>${coord?' <span class="mgr-badge coord">Coordinator</span>':''}</div>
+      <div><span class="mgr-name">${esc(mgrShow(sp))}</span> <span class="mgr-badge ${sp.is_active?'active':'inactive'}">${sp.is_active?'Active':'Inactive'}</span>${coord?' <span class="mgr-badge coord">Coordinator</span>':''}</div>
       <div class="mgr-meta">Email: ${sp.email ? esc(sp.email) : '<i>not on file</i>'}<br>Mobile: ${sp.mobile ? esc(sp.mobile) : '<i>not on file</i>'}<br>Talks: ${esc(talks)}</div>
       ${coord ? `<p class="muted" style="margin:10px 0 0">Your own name, email and mobile are updated with the link at the bottom of this page. Here you can only change your talks list.</p>` : ''}
       <div class="mgr-actions">
@@ -967,7 +1001,7 @@ function renderManage(){
   const list = mgrList(); if(!list){ area.innerHTML=''; return; }
   if(mgrSel && mgrSel !== '__new__' && !mgrFind(mgrSel)){ mgrSel = null; mgrForm = null; }
   const sp = mgrSel && mgrSel !== '__new__' ? mgrFind(mgrSel) : null;
-  const opts = list.map(s=>`<option value="${esc(s.id)}"${s.id===mgrSel?' selected':''}>${esc(mgrFull(s))}${s.is_coordinator?' — Coordinator':''}${s.is_active?'':' — inactive'}</option>`).join('');
+  const opts = list.map(s=>`<option value="${esc(s.id)}"${s.id===mgrSel?' selected':''}>${esc(mgrShow(s))}${s.is_coordinator?' — Coordinator':''}${s.is_active?'':' — inactive'}</option>`).join('');
   area.innerHTML = `
     <p class="muted sub-first">Add speakers, update their details and keep each speaker’s talks list up to date. Changes save straight away.</p>
     ${mgrFlash ? `<div class="mgr-flash ${mgrFlash.ok?'ok':'err'}" id="mgrFlash">${esc(mgrFlash.text)}</div>` : ''}
@@ -1027,7 +1061,7 @@ async function mgrPost(payload){
 function mgrApply(speaker){
   if(!speaker || !speaker.id) return;
   const list = mgrList(); const i = list.findIndex(s=>s.id===speaker.id);
-  if(i >= 0) list[i] = speaker; else list.push(speaker);
+  if(i >= 0){ if(speaker.appointment === undefined) speaker = { ...speaker, appointment: list[i].appointment }; list[i] = speaker; } else list.push(speaker);
   mgrSortList();
 }
 
@@ -1122,6 +1156,30 @@ function renderDetails(){
   });
 }
 function backToHub(){ view='hub'; render(); scrollToTop(); }
+
+// B2: ask the server to email the Darlington West speaker roster (with mobiles) to the coordinator's address on file.
+// Two calls: dry_run first (counts + recipient hint + cooldown, no names/mobiles) so the confirm can show where it is going.
+async function rosterPost(extra){
+  const res = await fetch(`${API}/booking-roster-email`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t:TOKEN,...extra})});
+  return await res.json();
+}
+function rosterMsg(ok,msg){ const el=document.getElementById('rosterMsg'); if(el) el.innerHTML = msg ? `<div class="roster-msg ${ok?'ok':'err'}">${esc(msg)}</div>` : ''; }
+async function emailRoster(btn){
+  btn.disabled = true; rosterMsg(true,'');
+  try{
+    const d = await rosterPost({dry_run:true});
+    if(!d.ok){ rosterMsg(false, d.message || 'Could not send the list — please try again.'); return; }
+    if(d.cooldown_minutes_left > 0){
+      const n = d.cooldown_minutes_left;
+      rosterMsg(false, `The list was already emailed to ${d.to_hint} within the last hour — please check your inbox (and spam folder). You can send it again in ${n} minute${n===1?'':'s'}.`);
+      return;
+    }
+    if(!confirm(`Email the list of ${d.count} speakers, with their phone numbers, to ${d.to_hint}?`)) return;
+    const j = await rosterPost({});
+    rosterMsg(!!j.ok, j.message || (j.ok ? 'The list has been emailed.' : 'Could not send the list — please try again.'));
+  }catch(e){ rosterMsg(false,'Could not reach the server — please check your connection and try again.'); }
+  finally{ btn.disabled = false; }
+}
 
 function banner(ok,msg){ const el=document.getElementById('banner'); if(!el||!msg) return; el.innerHTML=`<div class="banner ${ok?'ok':'err'}">${esc(msg)}</div>`; }
 function scrollToTop(){ window.scrollTo({top:0,behavior:'smooth'}); }
